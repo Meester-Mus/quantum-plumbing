@@ -67,8 +67,8 @@ output, H = model(x)
 # H:      (8, 32, 10)   – all possibilities considered
 print(h_utilization(H))  # How much thinking? (0–1)
 
-# Training
-loss = potential_loss(output, targets, H=H, h_diversity_weight=0.01)
+# Training  (y = ground-truth class labels, shape (32,))
+loss = potential_loss(output, y, H=H, h_diversity_weight=0.01)
 loss.backward()
 ```
 
@@ -129,7 +129,7 @@ This phase is intentionally research-first:
 - [x] Network assembly (PotentialSequential, PotentialMLP, potential_loss, h_utilization)
 - [x] Quantum interface (simulator path via Qiskit)
 - [x] Core tests for classical stack and network assembly
-- [~] Educational demos and docs alignment (in progress)
+- [x] Educational demos and docs alignment
 - [ ] Hardware quantum backend workflows (deferred)
 - [ ] Publishable benchmark suite (deferred)
 

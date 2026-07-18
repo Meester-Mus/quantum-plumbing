@@ -26,6 +26,9 @@ class PotentialDropout(nn.Module):
         self._is_potential_layer = True
         self._layer_type = "Dropout"
     
+    def extra_repr(self) -> str:
+        return f'p={self.p}'
+
     def forward(self, x: torch.Tensor, H: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Forward pass selecting from H.

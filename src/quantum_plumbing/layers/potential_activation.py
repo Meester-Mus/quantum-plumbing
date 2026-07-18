@@ -36,6 +36,9 @@ class PotentialActivation(nn.Module):
         self._is_potential_layer = True
         self._layer_type = f"Activation_{activation_type}"
     
+    def extra_repr(self) -> str:
+        return f'activation_type={self.activation_type}'
+
     def forward(self, x: torch.Tensor, H: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Forward pass applying activation while preserving H.

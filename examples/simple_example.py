@@ -10,6 +10,7 @@ Demonstrates:
 
 import torch
 from quantum_plumbing.layers import PotentialFCLayer
+from quantum_plumbing import h_utilization
 
 
 def main():
@@ -48,12 +49,13 @@ def main():
     print(f"   Each possibility: {H.shape[1:]}")
     print()
     
-    # Look at H scores
-    print("5. H scores (how probable is each possibility)...")
-    scores = H._scores
+    # Look at H scores for the first sample in the batch
+    print("5. H scores for sample 0 (how probable is each possibility)...")
+    scores = H._scores  # (num_potentials, batch_size)
     for i in range(layer.num_potentials):
-        avg_score = scores[i].mean().item()
-        print(f"   Potential {i}: {avg_score:.4f}")
+        score = scores[i, 0].item()
+        bar = "█" * int(score * 40)
+        print(f"   Potential {i}: {score:.4f}  {bar}")
     print()
     
     # Show what makes Quantum Plumbing different
@@ -68,14 +70,21 @@ def main():
     print(f"     Knows: Best choice PLUS all alternatives")
     print()
     
-    # Verify the network is thinking
+    # Verify the output is the scores-weighted combination of H
     print("7. Verifying thinking happens...")
-    print(f"   Output is weighted combination of H")
-    print(f"   Weights (scores): {scores[:, 0].detach().numpy()}")
+    reconstructed = torch.einsum('pb,pbo->bo', scores, H)
+    max_diff = torch.max(torch.abs(output - reconstructed)).item()
+    print(f"   output == weighted_sum(H, scores):  max_diff={max_diff:.2e}")
+    print()
+    
+    # Measure how much thinking space is being used
+    print("8. Measuring thinking space utilization...")
+    util = h_utilization(H)
+    print(f"   h_utilization = {util.item():.4f}  (0 = no thinking, 1 = full thinking)")
     print()
     
     # The revolutionary part
-    print("8. The revolutionary insight...")
+    print("9. The revolutionary insight...")
     print("   H is not forgotten - it flows to next layer")
     print("   Next layer KNOWS about alternatives")
     print("   This enables TRUE thinking")

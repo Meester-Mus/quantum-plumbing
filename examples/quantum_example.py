@@ -22,6 +22,9 @@ try:
         PotentialActivation,
         h_utilization,
     )
+    import quantum_plumbing.quantum_interface as _qi
+    if not _qi._QISKIT_AVAILABLE:
+        raise ImportError("Qiskit is not installed.")
 except ImportError as e:
     raise SystemExit(f"Install requirements: pip install 'quantum-plumbing[quantum]'\n{e}")
 

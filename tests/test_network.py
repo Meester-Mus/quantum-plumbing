@@ -1,5 +1,6 @@
 import pytest
 import torch
+import torch.nn as nn
 import torch.optim as optim
 
 from quantum_plumbing import (
@@ -45,7 +46,7 @@ class TestPotentialSequential:
     def test_no_fc_layer_raises(self):
         """A sequential with no FC layer should raise at forward time."""
         net = PotentialSequential()
-        # Manually add a non-FC layer won't produce H; but an empty net raises too.
+        # A non-FC-only stack would also fail because no layer produces H.
         x = torch.randn(4, 10)
         with pytest.raises(RuntimeError):
             net(x)
@@ -98,6 +99,43 @@ class TestPotentialSequential:
         _, H = net(x)
         assert hasattr(H, '_scores')
         assert H._scores.shape == (4, 6)
+
+    def test_custom_h_transform_layer_is_stackable(self):
+        class CustomHTransform(nn.Module):
+            def forward(self, x, H):
+                return x + 1.0, H + 2.0
+
+        net = PotentialSequential(
+            PotentialFCLayer(10, 5, num_potentials=3),
+            CustomHTransform(),
+        )
+        x = torch.randn(4, 10)
+        output, H = net(x)
+        assert output.shape == (4, 5)
+        assert H.shape == (3, 4, 5)
+
+    def test_custom_prev_h_layer_receives_previous_h(self):
+        class CustomPotentialGenerator(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.received_prev_h = None
+
+            def forward(self, x, prev_H=None):
+                self.received_prev_h = prev_H
+                assert prev_H is not None
+                next_H = prev_H + 1.0
+                return next_H.mean(dim=0), next_H
+
+        custom_layer = CustomPotentialGenerator()
+        net = PotentialSequential(
+            PotentialFCLayer(10, 5, num_potentials=3),
+            custom_layer,
+        )
+        x = torch.randn(4, 10)
+        output, H = net(x)
+        assert custom_layer.received_prev_h is not None
+        assert output.shape == (4, 5)
+        assert H.shape == (3, 4, 5)
 
 
 # ---------------------------------------------------------------------------
@@ -179,8 +217,13 @@ class TestPotentialLoss:
         target = torch.randint(0, 5, (8,))
         H = torch.randn(4, 8, 5)
         loss_no_reg = potential_loss(output, target, task='classification')
-        loss_with_reg = potential_loss(output, target, H=H, task='classification',
-                                       h_diversity_weight=0.01)
+        loss_with_reg = potential_loss(
+            output,
+            target,
+            H=H,
+            task='classification',
+            h_diversity_weight=0.01,
+        )
         # They should differ (diversity term changes the loss)
         assert not torch.isclose(loss_no_reg, loss_with_reg)
 
@@ -196,7 +239,11 @@ class TestPotentialLoss:
 
     def test_invalid_task(self):
         with pytest.raises(ValueError):
-            potential_loss(torch.randn(4, 3), torch.randint(0, 3, (4,)), task='unknown')
+            potential_loss(
+                torch.randn(4, 3),
+                torch.randint(0, 3, (4,)),
+                task='unknown',
+            )
 
     def test_differentiable(self):
         output = torch.randn(8, 5, requires_grad=True)

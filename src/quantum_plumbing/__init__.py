@@ -12,6 +12,7 @@ __email__ = "Mariussielcken@gmail.com"
 from .layers import PotentialFCLayer, PotentialBatchNorm, PotentialDropout, PotentialActivation
 from .network import PotentialSequential, PotentialMLP
 from .loss import potential_loss, h_utilization
+from .quantum_interface import QuantumHScorer, QuantumPotentialFCLayer
 
 __all__ = [
     # Layers
@@ -19,6 +20,9 @@ __all__ = [
     'PotentialBatchNorm',
     'PotentialDropout',
     'PotentialActivation',
+    # Quantum interface (requires qiskit)
+    'QuantumHScorer',
+    'QuantumPotentialFCLayer',
     # Network assembly
     'PotentialSequential',
     'PotentialMLP',

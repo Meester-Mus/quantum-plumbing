@@ -1,16 +1,62 @@
+import inspect
+import warnings
 import torch
 import torch.nn as nn
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 
-from .layers import PotentialFCLayer, PotentialBatchNorm, PotentialDropout, PotentialActivation
+from .layers import (
+    PotentialActivation,
+    PotentialBatchNorm,
+    PotentialDropout,
+    PotentialFCLayer,
+)
 
-# Layers that require (x, H) as input (not first-layer FC layers)
-_H_INPUT_LAYERS = (PotentialBatchNorm, PotentialDropout, PotentialActivation)
+_H_INPUT_PARAM_NAMES = {"H"}
+_H_GENERATOR_PARAM_NAMES = {"prev_H"}
+
+
+def _layer_call_mode(layer: nn.Module) -> str:
+    """
+    Infer how a layer wants H routed through its forward signature.
+
+    Modes:
+    - ``x_only``:    forward(x)
+    - ``x_with_h``:  forward(x, H)
+    - ``x_with_prev_h``: forward(x, prev_H=None)
+
+    Returns:
+        One of ``"x_only"``, ``"x_with_h"``, or ``"x_with_prev_h"``.
+    """
+    try:
+        param_names = set(inspect.signature(layer.forward).parameters)
+    except (AttributeError, TypeError, ValueError):
+        # Some built-in or compiled callables do not expose a Python signature.
+        warnings.warn(
+            f"Could not inspect forward signature for {type(layer).__name__}; "
+            "treating it as an x-only layer.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return "x_only"
+
+    has_prev_h = bool(param_names & _H_GENERATOR_PARAM_NAMES)
+    has_h = bool(param_names & _H_INPUT_PARAM_NAMES)
+
+    if has_prev_h and has_h:
+        raise ValueError(
+            f"{type(layer).__name__} has an ambiguous forward signature: "
+            "use either H or prev_H, not both."
+        )
+    if has_prev_h:
+        return "x_with_prev_h"
+    if has_h:
+        return "x_with_h"
+    return "x_only"
 
 
 class PotentialSequential(nn.Module):
     """
-    Sequential container for Potential layers that preserves H (thinking space).
+    Sequential container for Potential layers that preserves H.
 
     Works like nn.Sequential but routes H through each layer automatically.
     The first PotentialFCLayer is called with only x; every subsequent layer
@@ -43,33 +89,39 @@ class PotentialSequential(nn.Module):
 
         Returns:
             output: Final actualized output (batch_size, out_features)
-            H: Final hypothetical space (num_potentials, batch_size, out_features)
+            H: Final hypothetical space
+                (num_potentials, batch_size, out_features)
         """
         H: Optional[torch.Tensor] = None
 
         for layer in self.layers:
-            if isinstance(layer, _H_INPUT_LAYERS):
+            call_mode = _layer_call_mode(layer)
+
+            if call_mode == "x_with_h":
                 if H is None:
                     raise RuntimeError(
                         f"{type(layer).__name__} requires H from a preceding "
                         "PotentialFCLayer but no H has been produced yet."
                     )
                 x, H = layer(x, H)
-            elif isinstance(layer, PotentialFCLayer):
+            elif call_mode == "x_with_prev_h":
                 x, H = layer(x, prev_H=H)
             else:
-                # Plain nn.Module (e.g. a standard layer inserted for compatibility)
+                # Plain nn.Module inserted for compatibility.
                 x = layer(x)
 
         if H is None:
             raise RuntimeError(
-                "No PotentialFCLayer found in the network – H was never produced."
+                "No layer in the network produced H. Ensure at least one "
+                "layer accepts prev_H or returns H."
             )
 
         return x, H
 
     def __repr__(self) -> str:
-        layer_str = "\n".join(f"  ({i}): {layer}" for i, layer in enumerate(self.layers))
+        layer_str = "\n".join(
+            f"  ({i}): {layer}" for i, layer in enumerate(self.layers)
+        )
         return f"PotentialSequential(\n{layer_str}\n)"
 
 
@@ -109,14 +161,19 @@ def PotentialMLP(
         raise ValueError("layer_sizes must have at least 2 elements.")
 
     layers: List[nn.Module] = []
-    num_hidden = len(layer_sizes) - 2  # number of hidden layers
-
     for i in range(len(layer_sizes) - 1):
         in_dim = layer_sizes[i]
         out_dim = layer_sizes[i + 1]
         is_last = i == len(layer_sizes) - 2
 
-        layers.append(PotentialFCLayer(in_dim, out_dim, num_potentials=num_potentials, bias=bias))
+        layers.append(
+            PotentialFCLayer(
+                in_dim,
+                out_dim,
+                num_potentials=num_potentials,
+                bias=bias,
+            )
+        )
 
         if not is_last:
             if batch_norm:

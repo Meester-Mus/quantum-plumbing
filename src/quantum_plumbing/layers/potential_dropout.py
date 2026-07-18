@@ -26,8 +26,7 @@ class PotentialDropout(nn.Module):
         self._is_potential_layer = True
         self._layer_type = "Dropout"
     
-    def forward(self, x: torch.Tensor, 
-                H: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor, H: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Forward pass selecting from H.
         
@@ -40,28 +39,34 @@ class PotentialDropout(nn.Module):
             H_out: Hypotheses with structured selection
         """
         
+        if x.dim() != 2:
+            raise ValueError(f"x must be 2D (batch, features), got shape {tuple(x.shape)}")
+        if H.dim() != 3:
+            raise ValueError(
+                f"H must be 3D (num_potentials, batch, features), got shape {tuple(H.shape)}"
+            )
+        if x.shape[0] != H.shape[1] or x.shape[1] != H.shape[2]:
+            raise ValueError(
+                "x and H feature/batch dimensions must match: "
+                f"x={tuple(x.shape)}, H={tuple(H.shape)}"
+            )
+
         if not self.training or self.p == 0:
             return x, H
-        
-        # Select FROM H based on potential strength
-        # Rather than random discard
-        
-        # Score potentials - which are strongest?
-        scores = torch.norm(H, p=2, dim=(1, 2))  # (num_potentials,)
-        
-        # Threshold - keep above threshold probability
-        threshold = torch.quantile(scores, 1 - self.p)
-        mask = (scores > threshold).float()  # (num_potentials,)
-        
-        # Apply to both x and H
-        # Scale to maintain mean
-        x_out = x * (1.0 / (1.0 - self.p)) if self.p < 1 else x
-        H_out = H * mask.view(-1, 1, 1) * (1.0 / (1.0 - self.p)) if self.p < 1 else H
-        
+
+        # Structured feature mask inferred from H strengths.
+        feature_strength = torch.norm(H, p=2, dim=(0, 1))  # (features,)
+        threshold = torch.quantile(feature_strength, self.p)
+        mask = (feature_strength > threshold).to(dtype=x.dtype)  # (features,)
+        scale = 1.0 / (1.0 - self.p)
+
+        x_out = x * mask.view(1, -1) * scale
+        H_out = H * mask.view(1, 1, -1) * scale
+
         # Preserve H metadata
         H_out._is_potential = True
         H_out._layer = "Dropout"
         H_out._meaning = "Selected hypotheses (structured dropout)"
         H_out._mask = mask
-        
+
         return x_out, H_out

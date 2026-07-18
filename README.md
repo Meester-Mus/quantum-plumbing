@@ -109,6 +109,15 @@ This project is about:
 - [ARCHITECTURE.md](ARCHITECTURE.md) - Technical architecture
 - [docs/theory.md](docs/theory.md) - Mathematical foundation
 
+## Current Roadmap Focus (Research-First)
+
+This phase is intentionally research-first:
+
+- Prioritize conceptual clarity, reproducibility, and inspectability
+- Prioritize educational demo quality over publishable benchmarking
+- Keep quantum integration simulator-only (Qiskit statevector stability)
+- Defer hardware/backend workflows to a later phase
+
 ## Project Status
 
 🚀 **Early Stage – Under Active Development**
@@ -118,22 +127,24 @@ This project is about:
 - [x] Layers implementation (PotentialFCLayer)
 - [x] Additional layer types (BatchNorm, Dropout, Activation)
 - [x] Network assembly (PotentialSequential, PotentialMLP, potential_loss, h_utilization)
-- [ ] Quantum interface
-- [ ] Full integration
-- [ ] Tests & benchmarks
+- [x] Quantum interface (simulator path via Qiskit)
+- [x] Core tests for classical stack and network assembly
+- [~] Educational demos and docs alignment (in progress)
+- [ ] Hardware quantum backend workflows (deferred)
+- [ ] Publishable benchmark suite (deferred)
 
 ## Installation
 
 ```bash
 git clone https://github.com/Meester-Mus/quantum-plumbing.git
 cd quantum-plumbing
-pip install -e .
+pip install -e ".[dev]"
 ```
 
 ## Running Tests
 
 ```bash
-pytest tests/
+python -m pytest tests/
 ```
 
 ## Running Examples
@@ -141,6 +152,7 @@ pytest tests/
 ```bash
 python examples/simple_example.py   # Single layer demo
 python examples/network_example.py  # Full network training
+python examples/quantum_example.py  # Quantum scoring demo (simulator)
 ```
 
 ## Contributing

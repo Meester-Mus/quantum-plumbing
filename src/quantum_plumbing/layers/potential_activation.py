@@ -36,8 +36,7 @@ class PotentialActivation(nn.Module):
         self._is_potential_layer = True
         self._layer_type = f"Activation_{activation_type}"
     
-    def forward(self, x: torch.Tensor, 
-                H: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor, H: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Forward pass applying activation while preserving H.
         
@@ -50,6 +49,18 @@ class PotentialActivation(nn.Module):
             H_act: Activated hypotheses
         """
         
+        if x.dim() != 2:
+            raise ValueError(f"x must be 2D (batch, features), got shape {tuple(x.shape)}")
+        if H.dim() != 3:
+            raise ValueError(
+                f"H must be 3D (num_potentials, batch, features), got shape {tuple(H.shape)}"
+            )
+        if x.shape[0] != H.shape[1] or x.shape[1] != H.shape[2]:
+            raise ValueError(
+                "x and H feature/batch dimensions must match: "
+                f"x={tuple(x.shape)}, H={tuple(H.shape)}"
+            )
+
         # Apply activation to both
         x_act = self.activation(x)
         H_act = self.activation(H)

@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from typing import Tuple, Optional
+from typing import Tuple
 
 
 class PotentialBatchNorm(nn.Module):
@@ -43,8 +43,7 @@ class PotentialBatchNorm(nn.Module):
         self._is_potential_layer = True
         self._layer_type = "BatchNorm"
     
-    def forward(self, x: torch.Tensor, 
-                H: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor, H: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Forward pass: Normalize from H perspective.
         
@@ -57,36 +56,30 @@ class PotentialBatchNorm(nn.Module):
             H_norm: Normalized hypotheses
         """
         
+        if x.dim() != 2:
+            raise ValueError(f"x must be 2D (batch, features), got shape {tuple(x.shape)}")
+        if H.dim() != 3:
+            raise ValueError(
+                f"H must be 3D (num_potentials, batch, features), got shape {tuple(H.shape)}"
+            )
+        if x.shape[0] != H.shape[1] or x.shape[1] != H.shape[2]:
+            raise ValueError(
+                "x and H feature/batch dimensions must match: "
+                f"x={tuple(x.shape)}, H={tuple(H.shape)}"
+            )
+        if x.shape[1] != self.num_features:
+            raise ValueError(
+                f"Expected x to have {self.num_features} features, got {x.shape[1]}"
+            )
+
         if self.training:
-            # STEP 1: Calculate statistics FROM H
-            # This is key - we normalize x based on what H tells us
-            
-            # Shape of H: (num_potentials, batch_size, num_features)
-            # We want mean/var over batch and potentials
-            
-            # Mean across batch and potentials
-            mean_H = torch.mean(H, dim=(1, 2))  # (num_potentials,)
-            
-            # Variance across batch and potentials
-            var_H = torch.var(H, dim=(1, 2), unbiased=False)  # (num_potentials,)
-            
-            # Take mean of H statistics (average across potentials)
-            mean = torch.mean(mean_H)
-            var = torch.mean(var_H)
-            
-            # STEP 2: Normalize x using H statistics
-            # This is crucial: x is normalized from H perspective
+            # Calculate per-feature statistics from H across potential and batch axes.
+            mean = H.mean(dim=(0, 1))  # (features,)
+            var = H.var(dim=(0, 1), unbiased=False)  # (features,)
+
             x_norm = (x - mean) / torch.sqrt(var + self.eps)
-            
-            # STEP 3: Normalize H using same statistics
-            # Reshape for broadcasting
-            H_expanded_mean = mean_H.view(-1, 1, 1)  # (num_potentials, 1, 1)
-            H_expanded_var = var_H.view(-1, 1, 1)  # (num_potentials, 1, 1)
-            
-            # Normalize H
-            H_norm = (H - H_expanded_mean) / torch.sqrt(H_expanded_var + self.eps)
-            
-            # STEP 4: Update running statistics (for inference)
+            H_norm = (H - mean.view(1, 1, -1)) / torch.sqrt(var.view(1, 1, -1) + self.eps)
+
             with torch.no_grad():
                 self.running_mean.copy_(
                     (1 - self.momentum) * self.running_mean + self.momentum * mean
@@ -94,18 +87,18 @@ class PotentialBatchNorm(nn.Module):
                 self.running_var.copy_(
                     (1 - self.momentum) * self.running_var + self.momentum * var
                 )
-        
         else:
-            # Inference: use running statistics
-            x_norm = (x - self.running_mean) / torch.sqrt(self.running_var + self.eps)
-            H_norm = H  # In inference, H not needed for normalization
+            mean = self.running_mean
+            var = self.running_var
+            x_norm = (x - mean) / torch.sqrt(var + self.eps)
+            H_norm = (H - mean.view(1, 1, -1)) / torch.sqrt(var.view(1, 1, -1) + self.eps)
         
         # STEP 5: Apply learnable scale and shift
         # These help the network learn optimal normalization
         x_norm = x_norm * self.weight + self.bias
         H_norm = H_norm * self.weight.view(1, 1, -1) + self.bias.view(1, 1, -1)
         
-        # STEP 6: Preserve H metadata
+        # Preserve H metadata
         H_norm._is_potential = True
         H_norm._layer = "BatchNorm"
         H_norm._meaning = "Hypotheses after potential batch normalization"

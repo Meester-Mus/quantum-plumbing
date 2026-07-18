@@ -67,7 +67,24 @@ class PotentialFCLayer(nn.Module):
             output: Best choice (batch_size, out_features)
             H: All possibilities (num_potentials, batch_size, out_features)
         """
-        
+        if x.dim() != 2:
+            raise ValueError(f"x must be 2D (batch, features), got shape {tuple(x.shape)}")
+        if x.shape[1] != self.in_features:
+            raise ValueError(
+                f"Expected x to have {self.in_features} features, got {x.shape[1]}"
+            )
+        if prev_H is not None:
+            if prev_H.dim() != 3:
+                raise ValueError(
+                    "prev_H must be 3D (num_potentials, batch, features), "
+                    f"got shape {tuple(prev_H.shape)}"
+                )
+            if prev_H.shape[1] != x.shape[0]:
+                raise ValueError(
+                    "prev_H batch size must match x batch size: "
+                    f"prev_H={tuple(prev_H.shape)}, x={tuple(x.shape)}"
+                )
+
         # STEP 1: GENERATE H
         # Calculate all possible outputs with all possible weights
         H_list = []

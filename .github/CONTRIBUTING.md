@@ -16,23 +16,21 @@ We welcome contributions!
 ## Areas for Contribution
 
 ### High Priority
-- [ ] Potential BatchNorm implementation
-- [ ] Potential Dropout implementation  
-- [ ] Potential Loss functions
-- [ ] Network assembly (stacking layers)
-- [ ] Training loops
-- [ ] MNIST benchmark
+- [ ] Educational demo polish and walkthrough clarity
+- [ ] Layer contract tests (shape/metadata/train-eval invariants)
+- [ ] Research-grade reproducibility for example experiments
+- [ ] Simulator-only quantum stability hardening
+- [ ] Lightweight baseline benchmark/reporting templates
 
 ### Medium Priority
-- [ ] Quantum interface design
-- [ ] Quantum circuit implementation
-- [ ] Visualization tools
+- [ ] Controlled comparative benchmarks (classical vs potential)
+- [ ] Visualization tools for H trajectories and scores
 - [ ] Documentation
 
 ### Lower Priority
 - [ ] Performance optimization
 - [ ] Additional layer types
-- [ ] Extended examples
+- [ ] Hardware-backend quantum workflows
 
 ## Code Standards
 

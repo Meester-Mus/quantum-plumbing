@@ -7,9 +7,16 @@ from quantum_plumbing import (
     PotentialBatchNorm,
     PotentialDropout,
     PotentialActivation,
+    PotentialConv2d,
+    PotentialLayerNorm,
+    PotentialEmbedding,
+    PotentialMultiheadAttention,
     PotentialSequential,
     PotentialMLP,
+    PotentialTransformerBlock,
     potential_loss,
+    h_confidence,
+    h_diversity,
     h_utilization,
 )
 
@@ -67,8 +74,13 @@ class TestPotentialSequential:
         loss = output.sum()
         loss.backward()
         assert x.grad is not None
-        for param in net.parameters():
+        prev_h_grads = []
+        for name, param in net.named_parameters():
+            if "prev_h_projections" in name:
+                prev_h_grads.append(param.grad)
+                continue
             assert param.grad is not None
+        assert any(grad is not None for grad in prev_h_grads)
 
     def test_train_eval_mode(self):
         net = self._simple_net()
@@ -98,6 +110,16 @@ class TestPotentialSequential:
         _, H = net(x)
         assert hasattr(H, '_scores')
         assert H._scores.shape == (4, 6)
+
+    def test_embedding_then_attention(self):
+        net = PotentialSequential(
+            PotentialEmbedding(32, 16, num_potentials=4),
+            PotentialMultiheadAttention(16, 4, num_potentials=4),
+        )
+        x = torch.randint(0, 32, (3, 5))
+        output, H = net(x)
+        assert output.shape == (3, 5, 16)
+        assert H.shape == (4, 3, 5, 16)
 
 
 # ---------------------------------------------------------------------------
@@ -145,14 +167,82 @@ class TestPotentialMLP:
         x = torch.randn(8, 20)
         output, H = model(x)
         output.sum().backward()
-        for p in model.parameters():
-            assert p.grad is not None
+        prev_h_grads = []
+        for name, param in model.named_parameters():
+            if "prev_h_projections" in name:
+                prev_h_grads.append(param.grad)
+                continue
+            assert param.grad is not None
+        assert any(grad is not None for grad in prev_h_grads)
 
     def test_no_bias(self):
         model = PotentialMLP([20, 10], num_potentials=4, bias=False)
         x = torch.randn(4, 20)
         output, H = model(x)
         assert output.shape == (4, 10)
+
+
+class TestAdditionalPotentialLayers:
+    def test_batch_norm_eval_normalizes_h(self):
+        layer = PotentialBatchNorm(4)
+        layer.running_mean.copy_(torch.tensor([1.0, 2.0, 3.0, 4.0]))
+        layer.running_var.copy_(torch.tensor([4.0, 9.0, 16.0, 25.0]))
+        layer.eval()
+
+        x = torch.tensor([[1.0, 2.0, 3.0, 4.0]])
+        H = torch.tensor(
+            [[[3.0, 5.0, 7.0, 9.0]], [[1.0, 2.0, 3.0, 4.0]]]
+        )
+        _, H_out = layer(x, H)
+        expected = (H - layer.running_mean.view(1, 1, -1)) / torch.sqrt(
+            layer.running_var.view(1, 1, -1) + layer.eps
+        )
+        expected = expected * layer.weight.view(1, 1, -1) + layer.bias.view(1, 1, -1)
+        assert torch.allclose(H_out, expected)
+
+    def test_potential_conv2d_shapes(self):
+        layer = PotentialConv2d(3, 6, kernel_size=3, padding=1, num_potentials=4)
+        x = torch.randn(2, 3, 8, 8)
+        output, H = layer(x)
+        assert output.shape == (2, 6, 8, 8)
+        assert H.shape == (4, 2, 6, 8, 8)
+
+    def test_potential_conv2d_prev_h(self):
+        layer = PotentialConv2d(3, 6, kernel_size=3, padding=1, num_potentials=4)
+        x = torch.randn(2, 3, 8, 8)
+        prev_h = torch.randn(4, 2, 3, 8, 8)
+        output, H = layer(x, prev_H=prev_h)
+        assert output.shape == (2, 6, 8, 8)
+        assert H.shape == (4, 2, 6, 8, 8)
+
+    def test_potential_layer_norm_shapes(self):
+        layer = PotentialLayerNorm(6)
+        x = torch.randn(2, 4, 6)
+        H = torch.randn(3, 2, 4, 6)
+        x_out, H_out = layer(x, H)
+        assert x_out.shape == x.shape
+        assert H_out.shape == H.shape
+
+    def test_potential_embedding_shapes(self):
+        layer = PotentialEmbedding(50, 12, num_potentials=4)
+        x = torch.randint(0, 50, (2, 7))
+        output, H = layer(x)
+        assert output.shape == (2, 7, 12)
+        assert H.shape == (4, 2, 7, 12)
+
+    def test_potential_multihead_attention_shapes(self):
+        layer = PotentialMultiheadAttention(16, 4, num_potentials=4)
+        x = torch.randn(2, 5, 16)
+        output, H = layer(x)
+        assert output.shape == (2, 5, 16)
+        assert H.shape == (4, 2, 5, 16)
+
+    def test_potential_transformer_block_shapes(self):
+        block = PotentialTransformerBlock(embed_dim=16, num_heads=4, num_potentials=4)
+        x = torch.randn(2, 5, 16)
+        output, H = block(x)
+        assert output.shape == (2, 5, 16)
+        assert H.shape == (4, 2, 5, 16)
 
 
 # ---------------------------------------------------------------------------
@@ -247,6 +337,20 @@ class TestHUtilization:
         _, H = layer(x)
         util = h_utilization(H)
         assert 0.0 <= util.item() <= 1.0
+
+    def test_h_diversity_returns_scalar(self):
+        H = torch.randn(4, 8, 10)
+        diversity = h_diversity(H)
+        assert diversity.shape == ()
+        assert diversity.item() >= 0.0
+
+    def test_h_confidence_matches_peaked_distribution(self):
+        H = torch.randn(4, 8, 10)
+        scores = torch.zeros(4, 8)
+        scores[0] = 1.0
+        H._scores = scores
+        confidence = h_confidence(H)
+        assert torch.isclose(confidence, torch.tensor(1.0), atol=1e-5)
 
 
 # ---------------------------------------------------------------------------

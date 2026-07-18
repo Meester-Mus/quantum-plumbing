@@ -1,6 +1,10 @@
+from typing import Optional, Tuple
+
 import torch
 import torch.nn as nn
-from typing import Tuple, Optional
+import torch.nn.functional as F
+
+from .._potential_ops import actualize_h, compute_h_scores
 
 
 class PotentialFCLayer(nn.Module):
@@ -18,11 +22,14 @@ class PotentialFCLayer(nn.Module):
     alternatives even when choosing the best.
     """
     
-    def __init__(self, 
-                 in_features: int, 
-                 out_features: int,
-                 num_potentials: int = 8,
-                 bias: bool = True):
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        num_potentials: int = 8,
+        bias: bool = True,
+        use_prev_h: bool = True,
+    ):
         """
         Args:
             in_features: Input feature dimension
@@ -35,11 +42,15 @@ class PotentialFCLayer(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.num_potentials = num_potentials
+        self.use_prev_h = use_prev_h
         
         # CORE: Multiple weight matrices - this IS the thinking space
         # Shape: (num_potentials, out_features, in_features)
         # Meaning: num_potentials different possible transformations
         self.weight_potentials = nn.Parameter(
+            torch.randn(num_potentials, out_features, in_features) / (in_features ** 0.5)
+        )
+        self.prev_h_projections = nn.Parameter(
             torch.randn(num_potentials, out_features, in_features) / (in_features ** 0.5)
         )
         
@@ -54,8 +65,46 @@ class PotentialFCLayer(nn.Module):
         self._is_potential_layer = True
         self._layer_type = "FC"
     
-    def forward(self, x: torch.Tensor, 
-                prev_H: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _context_from_prev_h(
+        self,
+        prev_H: Optional[torch.Tensor],
+        index: int,
+    ) -> Optional[torch.Tensor]:
+        if prev_H is None or not self.use_prev_h:
+            return None
+        if prev_H.shape[0] != self.num_potentials:
+            raise ValueError(
+                f"prev_H first dimension must match num_potentials={self.num_potentials}, "
+                f"got {prev_H.shape[0]}"
+            )
+        if prev_H.shape[-1] != self.in_features:
+            raise ValueError(
+                f"prev_H last dimension must match in_features={self.in_features}, "
+                f"got {prev_H.shape[-1]}"
+            )
+        return F.linear(prev_H[index], self.prev_h_projections[index])
+
+    def _generate_h(
+        self,
+        x: torch.Tensor,
+        prev_H: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        H_list = []
+        for i in range(self.num_potentials):
+            out_i = F.linear(
+                x,
+                self.weight_potentials[i],
+                self.bias_potentials[i] if self.bias_potentials is not None else None,
+            )
+            prev_context = self._context_from_prev_h(prev_H, i)
+            if prev_context is not None:
+                out_i = out_i + prev_context
+            H_list.append(out_i)
+        return torch.stack(H_list, dim=0)
+
+    def forward(
+        self, x: torch.Tensor, prev_H: Optional[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Forward pass with thinking space (H) preservation.
         
@@ -70,37 +119,17 @@ class PotentialFCLayer(nn.Module):
         
         # STEP 1: GENERATE H
         # Calculate all possible outputs with all possible weights
-        H_list = []
-        
-        for i in range(self.num_potentials):
-            # Get i-th potential weight matrix
-            w_i = self.weight_potentials[i]  # (out, in)
-            
-            # Calculate output with these weights
-            out_i = torch.nn.functional.linear(
-                x,  # (batch, in)
-                w_i,  # (out, in)
-                self.bias_potentials[i] if self.bias_potentials is not None else None
-            )
-            # out_i: (batch, out)
-            
-            H_list.append(out_i)
-        
-        # Stack all possibilities into H
-        # H: (num_potentials, batch, out)
-        H = torch.stack(H_list, dim=0)
+        H = self._generate_h(x, prev_H=prev_H)
         
         # STEP 2: EVALUATE H
         # Which possibilities are stronger/weaker?
         # For now: use norm (later: quantum interference)
-        scores = torch.norm(H, p=2, dim=2, keepdim=True)  # (num_pot, batch, 1)
-        scores = torch.softmax(scores.squeeze(-1), dim=0)  # (num_pot, batch)
+        scores = compute_h_scores(H)
         
         # STEP 3: ACTUALIZE
         # Choose best via weighted combination
         # This gives: "I think this is best - but I know of others"
-        output = torch.einsum('pb,pbo->bo', scores, H)
-        # output: (batch, out)
+        output = actualize_h(H, scores)
         
         # STEP 4: PRESERVE H FOR NEXT LAYER
         # Metadata - this IS thinking space
@@ -112,7 +141,10 @@ class PotentialFCLayer(nn.Module):
         return output, H
     
     def extra_repr(self) -> str:
-        return (f'in_features={self.in_features}, '
-                f'out_features={self.out_features}, '
-                f'num_potentials={self.num_potentials}, '
-                f'bias={self.bias_potentials is not None}')
+        return (
+            f'in_features={self.in_features}, '
+            f'out_features={self.out_features}, '
+            f'num_potentials={self.num_potentials}, '
+            f'bias={self.bias_potentials is not None}, '
+            f'use_prev_h={self.use_prev_h}'
+        )

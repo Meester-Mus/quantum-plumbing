@@ -88,3 +88,40 @@ def h_utilization(H: torch.Tensor) -> torch.Tensor:
     cv = (std_h / (torch.abs(mean_h) + 1e-8)).mean()
     # Normalise loosely to [0, 1] by clamping
     return torch.clamp(cv, 0.0, 1.0)
+
+
+def h_diversity(H: torch.Tensor) -> torch.Tensor:
+    """
+    Measure how different the hypotheses in H are from each other.
+
+    Uses average pairwise cosine distance across potentials, averaged over the
+    batch. Returns 0 when there is only a single hypothesis.
+    """
+    num_potentials = H.shape[0]
+    if num_potentials < 2:
+        return torch.zeros((), dtype=H.dtype, device=H.device)
+
+    flat_H = H.reshape(num_potentials, H.shape[1], -1)
+    normalized = F.normalize(flat_H, p=2, dim=2, eps=1e-8)
+    similarities = torch.einsum("pbf,qbf->pqb", normalized, normalized)
+    distances = 1.0 - similarities
+    upper_indices = torch.triu_indices(num_potentials, num_potentials, offset=1, device=H.device)
+    pairwise = distances[upper_indices[0], upper_indices[1]]
+    return pairwise.mean()
+
+
+def h_confidence(H: torch.Tensor) -> torch.Tensor:
+    """
+    Measure decisiveness of the hypothesis distribution.
+
+    Returns 1 when the score distribution is fully peaked and 0 when it is
+    maximally spread out.
+    """
+    scores = getattr(H, "_scores", None)
+    if scores is None:
+        scores = torch.softmax(torch.norm(H.reshape(H.shape[0], H.shape[1], -1), p=2, dim=2), dim=0)
+    num_potentials = scores.shape[0]
+    entropy = -torch.sum(scores * torch.log(scores + 1e-8), dim=0)
+    max_entropy = torch.log(torch.as_tensor(float(num_potentials), dtype=scores.dtype, device=scores.device))
+    normalized_entropy = entropy / (max_entropy + 1e-8)
+    return (1.0 - normalized_entropy).mean()

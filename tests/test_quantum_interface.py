@@ -11,6 +11,7 @@ pytest.importorskip("qiskit", reason="qiskit not installed – skipping quantum 
 
 from quantum_plumbing.quantum_interface import QuantumHScorer, QuantumPotentialFCLayer
 from quantum_plumbing.layers import PotentialFCLayer
+from quantum_plumbing import QuantumMLP
 
 
 # ---------------------------------------------------------------------------
@@ -193,15 +194,15 @@ class TestQuantumPotentialFCLayer:
         output, H = layer(x)
         assert output.shape == (1, 5)
 
-    def test_prev_h_ignored(self):
-        """prev_H is accepted for API compat but doesn't change output."""
+    def test_prev_h_changes_output(self):
+        """prev_H should influence quantum-scored layers too."""
         layer = QuantumPotentialFCLayer(10, 5, num_potentials=4)
         x = torch.randn(4, 10)
         out_no_h, H_no_h = layer(x, prev_H=None)
         dummy_prev = torch.randn(4, 4, 10)
         out_with_h, H_with_h = layer(x, prev_H=dummy_prev)
-        # Same x → same output (quantum scorer depends on H norms, not prev_H)
-        assert torch.allclose(out_no_h, out_with_h)
+        assert not torch.allclose(out_no_h, out_with_h)
+        assert not torch.allclose(H_no_h, H_with_h)
 
     def test_quantum_scores_differ_from_classical(self):
         """Quantum scoring should produce different scores than classical norm-softmax."""
@@ -240,6 +241,13 @@ class TestQuantumPotentialFCLayer:
         output, H = net(x)
         assert output.shape == (8, 5)
         assert H.shape == (4, 8, 5)
+
+    def test_quantum_mlp_builder(self):
+        model = QuantumMLP([10, 8, 4], num_potentials=4, dropout_p=0.0, batch_norm=False)
+        x = torch.randn(3, 10)
+        output, H = model(x)
+        assert output.shape == (3, 4)
+        assert H.shape == (4, 3, 4)
 
 
 # ---------------------------------------------------------------------------

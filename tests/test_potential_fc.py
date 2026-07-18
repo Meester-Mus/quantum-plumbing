@@ -99,10 +99,47 @@ class TestPotentialFCLayer:
         assert out1.shape == (8, 10)
         assert H1.shape == (4, 8, 10)
         
-        # Second layer receives output (not H - that's for next phase)
-        out2, H2 = layer2(out1)
+        # Second layer receives output and H context
+        out2, H2 = layer2(out1, prev_H=H1)
         assert out2.shape == (8, 5)
         assert H2.shape == (4, 8, 5)
+
+    def test_prev_h_changes_output(self):
+        """Different previous H tensors should change the actualized result."""
+        torch.manual_seed(0)
+        layer = PotentialFCLayer(10, 5, num_potentials=4)
+        x = torch.randn(8, 10)
+        prev_h_a = torch.randn(4, 8, 10)
+        prev_h_b = torch.randn(4, 8, 10)
+
+        out_a, H_a = layer(x, prev_H=prev_h_a)
+        out_b, H_b = layer(x, prev_H=prev_h_b)
+
+        assert not torch.allclose(out_a, out_b)
+        assert not torch.allclose(H_a, H_b)
+
+    def test_prev_h_can_be_disabled(self):
+        """use_prev_h=False should ignore previous H context."""
+        torch.manual_seed(0)
+        layer = PotentialFCLayer(10, 5, num_potentials=4, use_prev_h=False)
+        x = torch.randn(8, 10)
+        prev_h_a = torch.randn(4, 8, 10)
+        prev_h_b = torch.randn(4, 8, 10)
+
+        out_a, H_a = layer(x, prev_H=prev_h_a)
+        out_b, H_b = layer(x, prev_H=prev_h_b)
+
+        assert torch.allclose(out_a, out_b)
+        assert torch.allclose(H_a, H_b)
+
+    def test_prev_h_shape_validation(self):
+        """prev_H shape must align with layer expectations."""
+        layer = PotentialFCLayer(10, 5, num_potentials=4)
+        x = torch.randn(8, 10)
+        with pytest.raises(ValueError):
+            layer(x, prev_H=torch.randn(3, 8, 10))
+        with pytest.raises(ValueError):
+            layer(x, prev_H=torch.randn(4, 8, 9))
     
     def test_batch_size_one(self):
         """Test with batch size 1."""

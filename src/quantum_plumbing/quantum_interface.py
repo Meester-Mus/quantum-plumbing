@@ -29,8 +29,8 @@ from typing import Optional, Tuple
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 
+from ._potential_ops import actualize_h
 from .layers import PotentialFCLayer
 
 try:
@@ -97,6 +97,7 @@ class QuantumHScorer:
         # max(1, ...) guards against num_potentials=1 where log2(1)=0
         self._n_qubits: int = max(1, math.ceil(math.log2(num_potentials)))
         self._state_size: int = 2 ** self._n_qubits
+        self._interference_matrix: Optional[np.ndarray] = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -118,20 +119,110 @@ class QuantumHScorer:
             scores: ``(num_potentials, batch_size)`` — probability
             distribution over hypotheses for each sample.
         """
-        _num_potentials, batch_size, _features = H.shape
+        _num_potentials = H.shape[0]
+        batch_size = H.shape[1]
         device = H.device
         dtype = H.dtype
 
         # Per-sample L2 norms as initial amplitudes → (P, B)
-        norms: np.ndarray = torch.norm(H, p=2, dim=2).detach().cpu().numpy()
-
-        scores_cols = [self._score_vector(norms[:, b]) for b in range(batch_size)]
-        scores_np = np.stack(scores_cols, axis=1)  # (num_potentials, batch)
+        norms = torch.norm(H.reshape(H.shape[0], H.shape[1], -1), p=2, dim=2).detach().cpu().numpy()
+        scores_np = self._score_batch(norms[:, :batch_size])
         return torch.tensor(scores_np, dtype=dtype, device=device)
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _score_batch(self, norms: np.ndarray) -> np.ndarray:
+        if self._backend is None:
+            return self._score_batch_statevector(norms)
+        return self._score_batch_backend(norms)
+
+    def _score_batch_statevector(self, norms: np.ndarray) -> np.ndarray:
+        totals = np.linalg.norm(norms, axis=0)
+        amplitudes = np.divide(
+            norms,
+            totals[np.newaxis, :],
+            out=np.zeros_like(norms, dtype=np.float64),
+            where=totals[np.newaxis, :] > 1e-10,
+        )
+        zero_cols = totals < 1e-10
+
+        state = np.zeros((self._state_size, norms.shape[1]), dtype=np.float64)
+        state[: self._num_potentials] = amplitudes
+
+        if self._interference_matrix is None:
+            base = np.array([[1.0, 1.0], [1.0, -1.0]], dtype=np.float64) / math.sqrt(2.0)
+            matrix = base
+            for _ in range(self._n_qubits - 1):
+                matrix = np.kron(matrix, base)
+            if self.n_interference_layers % 2 == 0:
+                matrix = np.eye(self._state_size, dtype=np.float64)
+            self._interference_matrix = matrix
+
+        mixed = self._interference_matrix @ state
+        probs = mixed ** 2
+        valid = probs[: self._num_potentials]
+        valid_sums = valid.sum(axis=0)
+        scores = np.divide(
+            valid,
+            valid_sums[np.newaxis, :],
+            out=np.zeros_like(valid),
+            where=valid_sums[np.newaxis, :] > 1e-10,
+        )
+        if np.any(zero_cols):
+            scores[:, zero_cols] = 1.0 / self._num_potentials
+        return scores
+
+    def _score_batch_backend(self, norms: np.ndarray) -> np.ndarray:
+        circuits = []
+        zero_cols = []
+        for column in range(norms.shape[1]):
+            norm_vector = norms[:, column]
+            total = float(np.linalg.norm(norm_vector))
+            if total < 1e-10:
+                zero_cols.append(column)
+                circuits.append(None)
+                continue
+            amplitudes = norm_vector / total
+            state = np.zeros(self._state_size, dtype=np.float64)
+            state[: self._num_potentials] = amplitudes
+            state = state / float(np.linalg.norm(state))
+            circuits.append(self._build_interference_circuit(state))
+
+        valid_circuits = [qc for qc in circuits if qc is not None]
+        probabilities = []
+        if valid_circuits:
+            from qiskit import transpile
+
+            measured = []
+            for qc in valid_circuits:
+                qc_m = qc.copy()
+                qc_m.measure_all()
+                measured.append(qc_m)
+            transpiled = transpile(measured, self._backend)
+            job = self._backend.run(transpiled, shots=self._shots)
+            for counts in job.result().get_counts():
+                probs = np.zeros(self._state_size, dtype=np.float64)
+                total_shots = sum(counts.values())
+                for bitstring, count in counts.items():
+                    idx = int(bitstring.replace(" ", ""), 2)
+                    if idx < self._state_size:
+                        probs[idx] = count / total_shots
+                probabilities.append(probs)
+
+        scores = np.zeros((self._num_potentials, norms.shape[1]), dtype=np.float64)
+        prob_index = 0
+        for column, qc in enumerate(circuits):
+            if qc is None:
+                scores[:, column] = 1.0 / self._num_potentials
+                continue
+            probs = probabilities[prob_index]
+            prob_index += 1
+            valid = probs[: self._num_potentials]
+            valid_sum = float(valid.sum())
+            scores[:, column] = valid / valid_sum if valid_sum > 1e-10 else 1.0 / self._num_potentials
+        return scores
 
     def _score_vector(self, norms: np.ndarray) -> np.ndarray:
         """
@@ -328,17 +419,7 @@ class QuantumPotentialFCLayer(PotentialFCLayer):
             H:      Hypothetical space ``(num_potentials, batch_size, out_features)``.
         """
         # ---- STEP 1: Generate H (identical to classical layer) ----------
-        H_list = []
-        for i in range(self.num_potentials):
-            w_i = self.weight_potentials[i]  # (out, in)
-            out_i = F.linear(
-                x,
-                w_i,
-                self.bias_potentials[i] if self.bias_potentials is not None else None,
-            )
-            H_list.append(out_i)
-
-        H = torch.stack(H_list, dim=0)  # (num_potentials, batch, out)
+        H = self._generate_h(x, prev_H=prev_H)
 
         # ---- STEP 2: Score via quantum circuit --------------------------
         # Scores are detached from the gradient graph: gradients flow
@@ -346,7 +427,7 @@ class QuantumPotentialFCLayer(PotentialFCLayer):
         scores = self.quantum_scorer.score(H)  # (num_potentials, batch)
 
         # ---- STEP 3: Actualize ------------------------------------------
-        output = torch.einsum("pb,pbo->bo", scores, H)
+        output = actualize_h(H, scores)
 
         # ---- STEP 4: Attach metadata ------------------------------------
         H._is_potential = True

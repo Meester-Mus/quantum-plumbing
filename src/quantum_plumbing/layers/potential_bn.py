@@ -98,7 +98,9 @@ class PotentialBatchNorm(nn.Module):
         else:
             # Inference: use running statistics
             x_norm = (x - self.running_mean) / torch.sqrt(self.running_var + self.eps)
-            H_norm = H  # In inference, H not needed for normalization
+            H_norm = (
+                H - self.running_mean.view(1, 1, -1)
+            ) / torch.sqrt(self.running_var.view(1, 1, -1) + self.eps)
         
         # STEP 5: Apply learnable scale and shift
         # These help the network learn optimal normalization

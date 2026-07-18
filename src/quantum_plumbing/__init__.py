@@ -10,10 +10,19 @@ __author__ = "Quantum Plumbing Team"
 __email__ = "Mariussielcken@gmail.com"
 
 from .layers import PotentialFCLayer, PotentialBatchNorm, PotentialDropout, PotentialActivation
+from .network import PotentialSequential, PotentialMLP
+from .loss import potential_loss, h_utilization
 
 __all__ = [
+    # Layers
     'PotentialFCLayer',
     'PotentialBatchNorm',
     'PotentialDropout',
     'PotentialActivation',
+    # Network assembly
+    'PotentialSequential',
+    'PotentialMLP',
+    # Loss and metrics
+    'potential_loss',
+    'h_utilization',
 ]

@@ -4,7 +4,6 @@ from typing import Tuple, Union
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class PotentialLayerNorm(nn.Module):
@@ -34,25 +33,22 @@ class PotentialLayerNorm(nn.Module):
     def forward(
         self, x: torch.Tensor, H: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        reference = H.mean(dim=0)
-        ref_dims = tuple(
-            range(reference.dim() - len(self.normalized_shape), reference.dim())
-        )
-        mean = reference.mean(dim=ref_dims, keepdim=True)
-        var = reference.var(dim=ref_dims, unbiased=False, keepdim=True)
-        x_norm = (x - mean) / torch.sqrt(var + self.eps)
+        normalized_dims = tuple(range(H.dim() - len(self.normalized_shape), H.dim()))
+        reduce_dims = (0, *normalized_dims)
+        mean = H.mean(dim=reduce_dims, keepdim=True)
+        var = H.var(dim=reduce_dims, unbiased=False, keepdim=True)
+        x_norm = (x - mean.squeeze(0)) / torch.sqrt(var.squeeze(0) + self.eps)
         if self.elementwise_affine:
             x_norm = x_norm * self.weight + self.bias
 
-        h_shape = H.shape
-        H_flat = H.reshape(h_shape[0] * h_shape[1], *h_shape[2:])
-        H_norm = F.layer_norm(
-            H_flat,
-            self.normalized_shape,
-            self.weight,
-            self.bias,
-            self.eps,
-        ).reshape(h_shape)
+        H_norm = (H - mean) / torch.sqrt(var + self.eps)
+        if self.elementwise_affine:
+            affine_shape = (1,) * (
+                H.dim() - len(self.normalized_shape)
+            ) + self.normalized_shape
+            H_norm = H_norm * self.weight.view(affine_shape) + self.bias.view(
+                affine_shape
+            )
 
         H_norm._is_potential = True
         H_norm._layer = "LayerNorm"

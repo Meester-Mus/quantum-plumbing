@@ -47,17 +47,21 @@ class PotentialDropout(nn.Module):
         # Select FROM H based on potential strength
         # Rather than random discard
 
-        # Score potentials - which are strongest?
-        scores = torch.norm(H, p=2, dim=(1, 2))  # (num_potentials,)
+        # Score feature positions across the full hypothesis space.
+        feature_strength = torch.mean(torch.abs(H), dim=(0, 1))
 
         # Threshold - keep above threshold probability
-        threshold = torch.quantile(scores, 1 - self.p)
-        mask = (scores > threshold).float()  # (num_potentials,)
+        threshold = torch.quantile(feature_strength, 1 - self.p)
+        mask = (feature_strength > threshold).float()
 
         # Apply to both x and H
         # Scale to maintain mean
-        x_out = x * (1.0 / (1.0 - self.p)) if self.p < 1 else x
-        H_out = H * mask.view(-1, 1, 1) * (1.0 / (1.0 - self.p)) if self.p < 1 else H
+        x_out = x * mask.unsqueeze(0) * (1.0 / (1.0 - self.p)) if self.p < 1 else x
+        H_out = (
+            H * mask.unsqueeze(0).unsqueeze(0) * (1.0 / (1.0 - self.p))
+            if self.p < 1
+            else H
+        )
 
         # Preserve H metadata
         H_out._is_potential = True

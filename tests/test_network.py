@@ -75,13 +75,11 @@ class TestPotentialSequential:
         loss = output.sum()
         loss.backward()
         assert x.grad is not None
-        prev_h_grads = []
         for name, param in net.named_parameters():
-            if "prev_h_projections" in name:
-                prev_h_grads.append(param.grad)
+            if name == "layers.0.prev_h_projections":
+                assert param.grad is None
                 continue
             assert param.grad is not None
-        assert any(grad is not None for grad in prev_h_grads)
 
     def test_train_eval_mode(self):
         net = self._simple_net()
@@ -169,13 +167,11 @@ class TestPotentialMLP:
         x = torch.randn(8, 20)
         output, H = model(x)
         output.sum().backward()
-        prev_h_grads = []
         for name, param in model.named_parameters():
-            if "prev_h_projections" in name:
-                prev_h_grads.append(param.grad)
+            if name == "layers.0.prev_h_projections":
+                assert param.grad is None
                 continue
             assert param.grad is not None
-        assert any(grad is not None for grad in prev_h_grads)
 
     def test_no_bias(self):
         model = PotentialMLP([20, 10], num_potentials=4, bias=False)

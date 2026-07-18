@@ -162,9 +162,9 @@ class QuantumHScorer:
             matrix = base
             for _ in range(self._n_qubits - 1):
                 matrix = np.kron(matrix, base)
-            if self.n_interference_layers % 2 == 0:
-                matrix = np.eye(self._state_size, dtype=np.float64)
-            self._interference_matrix = matrix
+            self._interference_matrix = np.linalg.matrix_power(
+                matrix, self.n_interference_layers
+            )
 
         mixed = self._interference_matrix @ state
         probs = mixed**2

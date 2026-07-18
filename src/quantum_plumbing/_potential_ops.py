@@ -29,3 +29,9 @@ def actualize_h(H: torch.Tensor, scores: torch.Tensor) -> torch.Tensor:
         *([1] * (H.dim() - 2)),
     )
     return torch.sum(H * scores.view(view_shape), dim=0)
+
+
+def mark_hypothesis_parameter(parameter: torch.nn.Parameter) -> torch.nn.Parameter:
+    """Mark a parameter as belonging to the hypothesis-specific path."""
+    parameter._is_hypothesis_parameter = True
+    return parameter

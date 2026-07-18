@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .._potential_ops import actualize_h, compute_h_scores
+from .._potential_ops import actualize_h, compute_h_scores, mark_hypothesis_parameter
 
 
 class PotentialFCLayer(nn.Module):
@@ -47,16 +47,22 @@ class PotentialFCLayer(nn.Module):
         # CORE: Multiple weight matrices - this IS the thinking space
         # Shape: (num_potentials, out_features, in_features)
         # Meaning: num_potentials different possible transformations
-        self.weight_potentials = nn.Parameter(
-            torch.randn(num_potentials, out_features, in_features) / (in_features**0.5)
+        self.weight_potentials = mark_hypothesis_parameter(
+            nn.Parameter(
+                torch.randn(num_potentials, out_features, in_features)
+                / (in_features**0.5)
+            )
         )
-        self.prev_h_projections = nn.Parameter(
-            torch.randn(num_potentials, out_features, in_features) / (in_features**0.5)
+        self.prev_h_projections = mark_hypothesis_parameter(
+            nn.Parameter(
+                torch.randn(num_potentials, out_features, in_features)
+                / (in_features**0.5)
+            )
         )
 
         if bias:
-            self.bias_potentials = nn.Parameter(
-                torch.randn(num_potentials, out_features) * 0.01
+            self.bias_potentials = mark_hypothesis_parameter(
+                nn.Parameter(torch.randn(num_potentials, out_features) * 0.01)
             )
         else:
             self.register_parameter("bias_potentials", None)

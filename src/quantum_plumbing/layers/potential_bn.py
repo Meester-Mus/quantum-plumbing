@@ -64,29 +64,18 @@ class PotentialBatchNorm(nn.Module):
             # This is key - we normalize x based on what H tells us
 
             # Shape of H: (num_potentials, batch_size, num_features)
-            # We want mean/var over batch and potentials
-
-            # Mean across batch and potentials
-            mean_H = torch.mean(H, dim=(1, 2))  # (num_potentials,)
-
-            # Variance across batch and potentials
-            var_H = torch.var(H, dim=(1, 2), unbiased=False)  # (num_potentials,)
-
-            # Take mean of H statistics (average across potentials)
-            mean = torch.mean(mean_H)
-            var = torch.mean(var_H)
+            # We want per-feature mean/var over potentials and batch.
+            mean = torch.mean(H, dim=(0, 1))  # (num_features,)
+            var = torch.var(H, dim=(0, 1), unbiased=False)  # (num_features,)
 
             # STEP 2: Normalize x using H statistics
             # This is crucial: x is normalized from H perspective
             x_norm = (x - mean) / torch.sqrt(var + self.eps)
 
             # STEP 3: Normalize H using same statistics
-            # Reshape for broadcasting
-            H_expanded_mean = mean_H.view(-1, 1, 1)  # (num_potentials, 1, 1)
-            H_expanded_var = var_H.view(-1, 1, 1)  # (num_potentials, 1, 1)
-
-            # Normalize H
-            H_norm = (H - H_expanded_mean) / torch.sqrt(H_expanded_var + self.eps)
+            H_norm = (H - mean.view(1, 1, -1)) / torch.sqrt(
+                var.view(1, 1, -1) + self.eps
+            )
 
             # STEP 4: Update running statistics (for inference)
             with torch.no_grad():

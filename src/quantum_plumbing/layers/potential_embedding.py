@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .._potential_ops import actualize_h, compute_h_scores
+from .._potential_ops import actualize_h, compute_h_scores, mark_hypothesis_parameter
 
 
 class PotentialEmbedding(nn.Module):
@@ -19,9 +19,11 @@ class PotentialEmbedding(nn.Module):
         self.num_embeddings = num_embeddings
         self.embedding_dim = embedding_dim
         self.num_potentials = num_potentials
-        self.weight_potentials = nn.Parameter(
-            torch.randn(num_potentials, num_embeddings, embedding_dim)
-            / (embedding_dim**0.5)
+        self.weight_potentials = mark_hypothesis_parameter(
+            nn.Parameter(
+                torch.randn(num_potentials, num_embeddings, embedding_dim)
+                / (embedding_dim**0.5)
+            )
         )
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:

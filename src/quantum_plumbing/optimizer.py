@@ -30,6 +30,8 @@ class HAwareOptimizer:
                 for param in group["params"]:
                     if param.grad is None or param.dim() == 0:
                         continue
+                    if not getattr(param, "_is_hypothesis_parameter", False):
+                        continue
                     if param.shape[0] != self._score_weights.shape[0]:
                         continue
                     scale = self._score_weights.to(param.grad.device, param.grad.dtype)

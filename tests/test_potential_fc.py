@@ -125,9 +125,9 @@ class TestPotentialFCLayer:
         """prev_H shape must align with layer expectations."""
         layer = PotentialFCLayer(10, 5, num_potentials=4)
         x = torch.randn(8, 10)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="num_potentials"):
             layer(x, prev_H=torch.randn(3, 8, 10))
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="in_features"):
             layer(x, prev_H=torch.randn(4, 8, 9))
 
     def test_batch_size_one(self):

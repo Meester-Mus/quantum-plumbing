@@ -42,6 +42,9 @@ class PotentialMultiheadAttention(nn.Module):
         self.prev_h_projections = nn.ModuleList(
             [nn.Linear(embed_dim, embed_dim, bias=False) for _ in range(num_potentials)]
         )
+        for module in list(self.attention_potentials) + list(self.prev_h_projections):
+            for parameter in module.parameters():
+                parameter._is_hypothesis_parameter = True
 
     def forward(
         self,

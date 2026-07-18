@@ -48,9 +48,12 @@ class PotentialConv2d(nn.Module):
         self.weight_potentials = mark_hypothesis_parameter(
             nn.Parameter(torch.randn(weight_shape) / scale)
         )
-        self.prev_h_projections = mark_hypothesis_parameter(
-            nn.Parameter(torch.randn(weight_shape) / scale)
-        )
+        if use_prev_h:
+            self.prev_h_projections = mark_hypothesis_parameter(
+                nn.Parameter(torch.randn(weight_shape) / scale)
+            )
+        else:
+            self.register_parameter("prev_h_projections", None)
         if bias:
             self.bias_potentials = mark_hypothesis_parameter(
                 nn.Parameter(torch.zeros(num_potentials, out_channels))

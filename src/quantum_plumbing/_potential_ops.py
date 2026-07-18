@@ -5,7 +5,7 @@ from typing import Tuple
 import torch
 
 
-def _flatten_potential_features(H: torch.Tensor) -> torch.Tensor:
+def _flatten_h_non_batch_dims(H: torch.Tensor) -> torch.Tensor:
     """Flatten all non-potential, non-batch dimensions into features."""
     if H.dim() < 3:
         raise ValueError(
@@ -16,7 +16,7 @@ def _flatten_potential_features(H: torch.Tensor) -> torch.Tensor:
 
 def compute_h_scores(H: torch.Tensor) -> torch.Tensor:
     """Compute per-batch hypothesis scores for any H tensor shape."""
-    flat_H = _flatten_potential_features(H)
+    flat_H = _flatten_h_non_batch_dims(H)
     scores = torch.norm(flat_H, p=2, dim=2)
     return torch.softmax(scores, dim=0)
 

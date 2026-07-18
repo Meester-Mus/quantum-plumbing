@@ -26,6 +26,17 @@ from quantum_plumbing import (
 # ---------------------------------------------------------------------------
 
 
+def assert_prev_h_gradients(model) -> None:
+    prev_h_grads = [
+        param.grad
+        for name, param in model.named_parameters()
+        if "prev_h_projections" in name
+    ]
+    assert prev_h_grads, "expected at least one prev_h_projections parameter"
+    assert any(grad is None for grad in prev_h_grads)
+    assert any(grad is not None for grad in prev_h_grads)
+
+
 class TestPotentialSequential:
     def _simple_net(self, in_f=20, hidden=10, out_f=5, num_potentials=4):
         return PotentialSequential(
@@ -76,11 +87,11 @@ class TestPotentialSequential:
         loss.backward()
         assert x.grad is not None
         for name, param in net.named_parameters():
-            if name == "layers.0.prev_h_projections":
-                # The first FC layer has no incoming H, so its prev_h path is unused.
-                assert param.grad is None
+            if "prev_h_projections" in name:
                 continue
             assert param.grad is not None
+        # The first FC layer has no incoming H, while later FC layers do.
+        assert_prev_h_gradients(net)
 
     def test_train_eval_mode(self):
         net = self._simple_net()
@@ -169,11 +180,10 @@ class TestPotentialMLP:
         output, H = model(x)
         output.sum().backward()
         for name, param in model.named_parameters():
-            if name == "layers.0.prev_h_projections":
-                # The first FC layer has no incoming H, so its prev_h path is unused.
-                assert param.grad is None
+            if "prev_h_projections" in name:
                 continue
             assert param.grad is not None
+        assert_prev_h_gradients(model)
 
     def test_no_bias(self):
         model = PotentialMLP([20, 10], num_potentials=4, bias=False)

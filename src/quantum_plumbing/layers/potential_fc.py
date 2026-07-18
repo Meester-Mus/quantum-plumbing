@@ -86,26 +86,20 @@ class PotentialFCLayer(nn.Module):
                 )
 
         # STEP 1: GENERATE H
-        # Calculate all possible outputs with all possible weights
-        H_list = []
-        
-        for i in range(self.num_potentials):
-            # Get i-th potential weight matrix
-            w_i = self.weight_potentials[i]  # (out, in)
-            
-            # Calculate output with these weights
-            out_i = torch.nn.functional.linear(
-                x,  # (batch, in)
-                w_i,  # (out, in)
-                self.bias_potentials[i] if self.bias_potentials is not None else None
-            )
-            # out_i: (batch, out)
-            
-            H_list.append(out_i)
-        
-        # Stack all possibilities into H
-        # H: (num_potentials, batch, out)
-        H = torch.stack(H_list, dim=0)
+        # Calculate all possible outputs with all possible weights in one
+        # vectorized operation (no Python loop over potentials).
+        #
+        # weight_potentials: (num_potentials, out_features, in_features)
+        # x:                 (batch_size, in_features)
+        # H:                 (num_potentials, batch_size, out_features)
+        #
+        # einsum index legend:
+        #   b = batch_size, i = in_features, p = num_potentials, o = out_features
+        H = torch.einsum('bi,poi->pbo', x, self.weight_potentials)
+        if self.bias_potentials is not None:
+            # bias_potentials: (num_potentials, out_features)
+            # unsqueeze → (num_potentials, 1, out_features) – broadcasts over batch
+            H = H + self.bias_potentials.unsqueeze(1)
         
         # STEP 2: EVALUATE H
         # Which possibilities are stronger/weaker?

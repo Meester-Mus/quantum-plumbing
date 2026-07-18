@@ -46,7 +46,7 @@ class TestPotentialSequential:
     def test_no_fc_layer_raises(self):
         """A sequential with no FC layer should raise at forward time."""
         net = PotentialSequential()
-        # A non-FC-only stack would also fail because no layer produces H.
+        # A stack with no layer producing H would also fail.
         x = torch.randn(4, 10)
         with pytest.raises(RuntimeError):
             net(x)
@@ -105,12 +105,13 @@ class TestPotentialSequential:
             def forward(self, x, H):
                 return x + 1.0, H + 2.0
 
-        net = PotentialSequential(
-            PotentialFCLayer(10, 5, num_potentials=3),
-            CustomHTransform(),
-        )
+        first_layer = PotentialFCLayer(10, 5, num_potentials=3)
+        net = PotentialSequential(first_layer, CustomHTransform())
         x = torch.randn(4, 10)
+        first_output, first_h = first_layer(x)
         output, H = net(x)
+        assert torch.allclose(output, first_output + 1.0)
+        assert torch.allclose(H, first_h + 2.0)
         assert output.shape == (4, 5)
         assert H.shape == (3, 4, 5)
 
@@ -122,20 +123,48 @@ class TestPotentialSequential:
 
             def forward(self, x, prev_H=None):
                 self.received_prev_h = prev_H
-                assert prev_H is not None
-                next_H = prev_H + 1.0
+                base_H = prev_H
+                if base_H is None:
+                    base_H = torch.zeros_like(x).unsqueeze(0)
+                next_H = base_H + 1.0
                 return next_H.mean(dim=0), next_H
 
+        first_layer = PotentialFCLayer(10, 5, num_potentials=3)
         custom_layer = CustomPotentialGenerator()
         net = PotentialSequential(
-            PotentialFCLayer(10, 5, num_potentials=3),
+            first_layer,
             custom_layer,
         )
         x = torch.randn(4, 10)
+        _, expected_prev_h = first_layer(x)
         output, H = net(x)
         assert custom_layer.received_prev_h is not None
+        assert custom_layer.received_prev_h.shape == expected_prev_h.shape
+        assert torch.allclose(custom_layer.received_prev_h, expected_prev_h)
         assert output.shape == (4, 5)
         assert H.shape == (3, 4, 5)
+
+    def test_custom_prev_h_layer_can_be_first(self):
+        class CustomPotentialGenerator(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.received_prev_h = None
+                self.was_called = False
+
+            def forward(self, x, prev_H=None):
+                self.was_called = True
+                self.received_prev_h = prev_H
+                H = torch.stack((x, x + 1.0), dim=0)
+                return H.mean(dim=0), H
+
+        custom_layer = CustomPotentialGenerator()
+        net = PotentialSequential(custom_layer)
+        x = torch.randn(4, 10)
+        output, H = net(x)
+        assert custom_layer.was_called
+        assert custom_layer.received_prev_h is None
+        assert output.shape == (4, 10)
+        assert H.shape == (2, 4, 10)
 
 
 # ---------------------------------------------------------------------------

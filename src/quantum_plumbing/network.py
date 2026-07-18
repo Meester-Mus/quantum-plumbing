@@ -1,4 +1,5 @@
 import inspect
+import warnings
 import torch
 import torch.nn as nn
 from typing import List, Optional, Tuple
@@ -10,8 +11,8 @@ from .layers import (
     PotentialFCLayer,
 )
 
-_H_INPUT_LAYER_NAMES = {"H"}
-_H_GENERATOR_LAYER_NAMES = {"prev_H"}
+_H_INPUT_PARAM_NAMES = {"H"}
+_H_GENERATOR_PARAM_NAMES = {"prev_H"}
 
 
 def _layer_call_mode(layer: nn.Module) -> str:
@@ -22,16 +23,33 @@ def _layer_call_mode(layer: nn.Module) -> str:
     - ``x_only``:    forward(x)
     - ``x_with_h``:  forward(x, H)
     - ``x_with_prev_h``: forward(x, prev_H=None)
-    """
-    param_names = {
-        name
-        for name in inspect.signature(layer.forward).parameters
-        if name != "self"
-    }
 
-    if param_names & _H_GENERATOR_LAYER_NAMES:
+    Returns:
+        One of ``"x_only"``, ``"x_with_h"``, or ``"x_with_prev_h"``.
+    """
+    try:
+        param_names = set(inspect.signature(layer.forward).parameters)
+    except (AttributeError, TypeError, ValueError):
+        # Some built-in or compiled callables do not expose a Python signature.
+        warnings.warn(
+            f"Could not inspect forward signature for {type(layer).__name__}; "
+            "treating it as an x-only layer.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return "x_only"
+
+    has_prev_h = bool(param_names & _H_GENERATOR_PARAM_NAMES)
+    has_h = bool(param_names & _H_INPUT_PARAM_NAMES)
+
+    if has_prev_h and has_h:
+        raise ValueError(
+            f"{type(layer).__name__} has an ambiguous forward signature: "
+            "use either H or prev_H, not both."
+        )
+    if has_prev_h:
         return "x_with_prev_h"
-    if param_names & _H_INPUT_LAYER_NAMES:
+    if has_h:
         return "x_with_h"
     return "x_only"
 
@@ -94,7 +112,8 @@ class PotentialSequential(nn.Module):
 
         if H is None:
             raise RuntimeError(
-                "No layer produced H in the network."
+                "No layer in the network produced H. Ensure at least one "
+                "layer accepts prev_H or returns H."
             )
 
         return x, H

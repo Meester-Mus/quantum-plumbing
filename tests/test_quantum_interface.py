@@ -2,17 +2,18 @@
 
 All tests are skipped automatically when Qiskit is not installed.
 """
-import numpy as np
+
 import pytest
 import torch
 
 # Skip the entire module if Qiskit is not installed.
-pytest.importorskip("qiskit", reason="qiskit not installed – skipping quantum interface tests")
+pytest.importorskip(
+    "qiskit", reason="qiskit not installed – skipping quantum interface tests"
+)
 
 from quantum_plumbing.quantum_interface import QuantumHScorer, QuantumPotentialFCLayer
 from quantum_plumbing.layers import PotentialFCLayer
 from quantum_plumbing import QuantumMLP
-
 
 # ---------------------------------------------------------------------------
 # QuantumHScorer
@@ -91,9 +92,9 @@ class TestQuantumHScorer:
         scorer2 = QuantumHScorer(4, n_interference_layers=2)
         scores1 = scorer1.score(H)
         scores2 = scorer2.score(H)
-        assert not torch.allclose(scores1, scores2), (
-            "Different interference depths should produce different scores"
-        )
+        assert not torch.allclose(
+            scores1, scores2
+        ), "Different interference depths should produce different scores"
 
     def test_score_dtype_preserved(self):
         """Output dtype should match H dtype."""
@@ -171,7 +172,9 @@ class TestQuantumPotentialFCLayer:
         x = torch.randn(4, 10, requires_grad=True)
         output, _ = layer(x)
         output.sum().backward()
-        assert layer.weight_potentials.grad is not None, "weight_potentials should have gradients"
+        assert (
+            layer.weight_potentials.grad is not None
+        ), "weight_potentials should have gradients"
         assert x.grad is not None, "input x should have gradients"
 
     def test_gradient_flows_through_bias(self):
@@ -205,7 +208,7 @@ class TestQuantumPotentialFCLayer:
         assert not torch.allclose(H_no_h, H_with_h)
 
     def test_quantum_scores_differ_from_classical(self):
-        """Quantum scoring should produce different scores than classical norm-softmax."""
+        """Quantum scoring should differ from classical norm-softmax scores."""
         torch.manual_seed(0)
         classical = PotentialFCLayer(10, 5, num_potentials=4)
         quantum = QuantumPotentialFCLayer(10, 5, num_potentials=4)
@@ -217,12 +220,14 @@ class TestQuantumPotentialFCLayer:
         _, H_classical = classical(x)
         _, H_quantum = quantum(x)
 
-        assert not torch.allclose(H_classical._scores, H_quantum._scores), (
-            "Quantum and classical scorers should differ"
-        )
+        assert not torch.allclose(
+            H_classical._scores, H_quantum._scores
+        ), "Quantum and classical scorers should differ"
 
     def test_extra_repr(self):
-        layer = QuantumPotentialFCLayer(10, 5, num_potentials=4, n_interference_layers=3)
+        layer = QuantumPotentialFCLayer(
+            10, 5, num_potentials=4, n_interference_layers=3
+        )
         r = layer.extra_repr()
         assert "n_interference_layers=3" in r
         assert "in_features=10" in r
@@ -243,7 +248,9 @@ class TestQuantumPotentialFCLayer:
         assert H.shape == (4, 8, 5)
 
     def test_quantum_mlp_builder(self):
-        model = QuantumMLP([10, 8, 4], num_potentials=4, dropout_p=0.0, batch_norm=False)
+        model = QuantumMLP(
+            [10, 8, 4], num_potentials=4, dropout_p=0.0, batch_norm=False
+        )
         x = torch.randn(3, 10)
         output, H = model(x)
         assert output.shape == (3, 4)

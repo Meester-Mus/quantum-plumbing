@@ -19,31 +19,38 @@ from .layers import (
     PotentialLayerNorm,
     PotentialMultiheadAttention,
 )
-from .network import PotentialSequential, PotentialMLP, PotentialTransformerBlock, QuantumMLP
+from .network import (
+    PotentialSequential,
+    PotentialMLP,
+    PotentialTransformerBlock,
+    QuantumMLP,
+)
 from .loss import potential_loss, h_confidence, h_diversity, h_utilization
+from .optimizer import HAwareOptimizer
 from .quantum_interface import QuantumHScorer, QuantumPotentialFCLayer
 
 __all__ = [
     # Layers
-    'PotentialFCLayer',
-    'PotentialBatchNorm',
-    'PotentialDropout',
-    'PotentialActivation',
-    'PotentialConv2d',
-    'PotentialLayerNorm',
-    'PotentialEmbedding',
-    'PotentialMultiheadAttention',
+    "PotentialFCLayer",
+    "PotentialBatchNorm",
+    "PotentialDropout",
+    "PotentialActivation",
+    "PotentialConv2d",
+    "PotentialLayerNorm",
+    "PotentialEmbedding",
+    "PotentialMultiheadAttention",
     # Quantum interface (requires qiskit)
-    'QuantumHScorer',
-    'QuantumPotentialFCLayer',
+    "QuantumHScorer",
+    "QuantumPotentialFCLayer",
     # Network assembly
-    'PotentialSequential',
-    'PotentialMLP',
-    'PotentialTransformerBlock',
-    'QuantumMLP',
+    "PotentialSequential",
+    "PotentialMLP",
+    "PotentialTransformerBlock",
+    "QuantumMLP",
     # Loss and metrics
-    'potential_loss',
-    'h_utilization',
-    'h_diversity',
-    'h_confidence',
+    "potential_loss",
+    "h_utilization",
+    "h_diversity",
+    "h_confidence",
+    "HAwareOptimizer",
 ]

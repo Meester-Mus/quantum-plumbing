@@ -17,7 +17,11 @@ class PotentialLayerNorm(nn.Module):
         elementwise_affine: bool = True,
     ) -> None:
         super().__init__()
-        self.normalized_shape = (normalized_shape,) if isinstance(normalized_shape, int) else tuple(normalized_shape)
+        self.normalized_shape = (
+            (normalized_shape,)
+            if isinstance(normalized_shape, int)
+            else tuple(normalized_shape)
+        )
         self.eps = eps
         self.elementwise_affine = elementwise_affine
         if elementwise_affine:
@@ -27,9 +31,13 @@ class PotentialLayerNorm(nn.Module):
             self.register_parameter("weight", None)
             self.register_parameter("bias", None)
 
-    def forward(self, x: torch.Tensor, H: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, x: torch.Tensor, H: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         reference = H.mean(dim=0)
-        ref_dims = tuple(range(reference.dim() - len(self.normalized_shape), reference.dim()))
+        ref_dims = tuple(
+            range(reference.dim() - len(self.normalized_shape), reference.dim())
+        )
         mean = reference.mean(dim=ref_dims, keepdim=True)
         var = reference.var(dim=ref_dims, unbiased=False, keepdim=True)
         x_norm = (x - mean) / torch.sqrt(var + self.eps)

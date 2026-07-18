@@ -8,12 +8,12 @@ from .potential_embedding import PotentialEmbedding
 from .potential_attention import PotentialMultiheadAttention
 
 __all__ = [
-    'PotentialFCLayer',
-    'PotentialBatchNorm',
-    'PotentialDropout',
-    'PotentialActivation',
-    'PotentialConv2d',
-    'PotentialLayerNorm',
-    'PotentialEmbedding',
-    'PotentialMultiheadAttention',
+    "PotentialFCLayer",
+    "PotentialBatchNorm",
+    "PotentialDropout",
+    "PotentialActivation",
+    "PotentialConv2d",
+    "PotentialLayerNorm",
+    "PotentialEmbedding",
+    "PotentialMultiheadAttention",
 ]

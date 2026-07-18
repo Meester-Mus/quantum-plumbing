@@ -51,7 +51,7 @@ No information loss.
 
 ```python
 import torch
-from quantum_plumbing import PotentialMLP, potential_loss, h_utilization
+from quantum_plumbing import PotentialMLP, potential_loss, h_utilization, h_diversity, h_confidence
 
 # Build a full thinking network
 model = PotentialMLP(
@@ -66,6 +66,8 @@ output, H = model(x)
 # output: (32, 10)      – best choice
 # H:      (8, 32, 10)   – all possibilities considered
 print(h_utilization(H))  # How much thinking? (0–1)
+print(h_diversity(H))    # How different are the hypotheses?
+print(h_confidence(H))   # How decisive is the current choice?
 
 # Training
 loss = potential_loss(output, targets, H=H, h_diversity_weight=0.01)
@@ -77,7 +79,8 @@ Or build a custom network layer-by-layer:
 ```python
 from quantum_plumbing import (
     PotentialFCLayer, PotentialBatchNorm,
-    PotentialDropout, PotentialActivation,
+    PotentialDropout, PotentialActivation, PotentialConv2d,
+    PotentialEmbedding, PotentialMultiheadAttention,
     PotentialSequential,
 )
 
@@ -116,11 +119,12 @@ This project is about:
 - [x] Theory complete
 - [x] Core concept validated
 - [x] Layers implementation (PotentialFCLayer)
-- [x] Additional layer types (BatchNorm, Dropout, Activation)
-- [x] Network assembly (PotentialSequential, PotentialMLP, potential_loss, h_utilization)
-- [ ] Quantum interface
-- [ ] Full integration
-- [ ] Tests & benchmarks
+- [x] Additional layer types (BatchNorm, Dropout, Activation, Conv2d, LayerNorm, Embedding, Attention)
+- [x] Network assembly (PotentialSequential, PotentialMLP, QuantumMLP, PotentialTransformerBlock)
+- [x] Quantum interface
+- [x] Tests for implemented layers and networks
+- [x] Benchmark scripts (MNIST, CIFAR-10, generalization)
+- [x] CI workflow
 
 ## Installation
 
@@ -141,6 +145,9 @@ pytest tests/
 ```bash
 python examples/simple_example.py   # Single layer demo
 python examples/network_example.py  # Full network training
+python examples/mnist_benchmark.py  # MLP benchmark (requires torchvision)
+python examples/cifar10_benchmark.py  # CNN benchmark (requires torchvision)
+python examples/generalization_benchmark.py  # low-data benchmark (requires torchvision)
 ```
 
 ## Contributing

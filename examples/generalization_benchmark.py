@@ -13,7 +13,9 @@ from quantum_plumbing import PotentialMLP, potential_loss
 try:
     from torchvision import datasets, transforms
 except ImportError as exc:  # pragma: no cover
-    raise SystemExit("Install torchvision to run this benchmark: pip install torchvision") from exc
+    raise SystemExit(
+        "Install torchvision to run this benchmark: pip install torchvision"
+    ) from exc
 
 
 def subset_dataset(dataset, fraction: float = 0.1):
@@ -23,11 +25,21 @@ def subset_dataset(dataset, fraction: float = 0.1):
 
 
 def make_loaders(batch_size: int = 128, fraction: float = 0.1):
-    transform = transforms.Compose([transforms.ToTensor(), transforms.Lambda(lambda x: x.view(-1))])
-    train = datasets.MNIST(root="./data", train=True, download=True, transform=transform)
-    test = datasets.MNIST(root="./data", train=False, download=True, transform=transform)
+    transform = transforms.Compose(
+        [transforms.ToTensor(), transforms.Lambda(lambda x: x.view(-1))]
+    )
+    train = datasets.MNIST(
+        root="./data", train=True, download=True, transform=transform
+    )
+    test = datasets.MNIST(
+        root="./data", train=False, download=True, transform=transform
+    )
     return (
-        torch.utils.data.DataLoader(subset_dataset(train, fraction=fraction), batch_size=batch_size, shuffle=True),
+        torch.utils.data.DataLoader(
+            subset_dataset(train, fraction=fraction),
+            batch_size=batch_size,
+            shuffle=True,
+        ),
         torch.utils.data.DataLoader(test, batch_size=batch_size),
     )
 

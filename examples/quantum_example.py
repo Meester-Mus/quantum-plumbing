@@ -23,7 +23,9 @@ try:
         h_utilization,
     )
 except ImportError as e:
-    raise SystemExit(f"Install requirements: pip install 'quantum-plumbing[quantum]'\n{e}")
+    raise SystemExit(
+        f"Install requirements: pip install 'quantum-plumbing[quantum]'\n{e}"
+    )
 
 
 def section(title: str) -> None:
@@ -61,7 +63,9 @@ def main() -> None:
     quantum_layer = QuantumPotentialFCLayer(10, 5, num_potentials=4)
 
     # Share weights — only the scoring method differs
-    quantum_layer.weight_potentials.data = classical_layer.weight_potentials.data.clone()
+    quantum_layer.weight_potentials.data = (
+        classical_layer.weight_potentials.data.clone()
+    )
     quantum_layer.bias_potentials.data = classical_layer.bias_potentials.data.clone()
 
     x = torch.randn(4, 10)
@@ -102,7 +106,7 @@ def main() -> None:
     output, _ = layer(x)
     output.sum().backward()
 
-    print(f"\n  Quantum scores are detached — gradients still flow through H values:")
+    print("\n  Quantum scores are detached — gradients still flow through H values:")
     print(f"    weight_potentials.grad : {layer.weight_potentials.grad.norm():.4f}")
     print(f"    x.grad                 : {x.grad.norm():.4f}")
     print("  ✓ Training loop works correctly with quantum scoring")

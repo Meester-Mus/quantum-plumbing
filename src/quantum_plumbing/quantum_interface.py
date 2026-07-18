@@ -96,7 +96,7 @@ class QuantumHScorer:
         # Smallest power of 2 ≥ num_potentials
         # max(1, ...) guards against num_potentials=1 where log2(1)=0
         self._n_qubits: int = max(1, math.ceil(math.log2(num_potentials)))
-        self._state_size: int = 2 ** self._n_qubits
+        self._state_size: int = 2**self._n_qubits
         self._interference_matrix: Optional[np.ndarray] = None
 
     # ------------------------------------------------------------------
@@ -119,13 +119,17 @@ class QuantumHScorer:
             scores: ``(num_potentials, batch_size)`` — probability
             distribution over hypotheses for each sample.
         """
-        _num_potentials = H.shape[0]
         batch_size = H.shape[1]
         device = H.device
         dtype = H.dtype
 
         # Per-sample L2 norms as initial amplitudes → (P, B)
-        norms = torch.norm(H.reshape(H.shape[0], H.shape[1], -1), p=2, dim=2).detach().cpu().numpy()
+        norms = (
+            torch.norm(H.reshape(H.shape[0], H.shape[1], -1), p=2, dim=2)
+            .detach()
+            .cpu()
+            .numpy()
+        )
         scores_np = self._score_batch(norms[:, :batch_size])
         return torch.tensor(scores_np, dtype=dtype, device=device)
 
@@ -152,7 +156,9 @@ class QuantumHScorer:
         state[: self._num_potentials] = amplitudes
 
         if self._interference_matrix is None:
-            base = np.array([[1.0, 1.0], [1.0, -1.0]], dtype=np.float64) / math.sqrt(2.0)
+            base = np.array([[1.0, 1.0], [1.0, -1.0]], dtype=np.float64) / math.sqrt(
+                2.0
+            )
             matrix = base
             for _ in range(self._n_qubits - 1):
                 matrix = np.kron(matrix, base)
@@ -161,7 +167,7 @@ class QuantumHScorer:
             self._interference_matrix = matrix
 
         mixed = self._interference_matrix @ state
-        probs = mixed ** 2
+        probs = mixed**2
         valid = probs[: self._num_potentials]
         valid_sums = valid.sum(axis=0)
         scores = np.divide(
@@ -221,7 +227,9 @@ class QuantumHScorer:
             prob_index += 1
             valid = probs[: self._num_potentials]
             valid_sum = float(valid.sum())
-            scores[:, column] = valid / valid_sum if valid_sum > 1e-10 else 1.0 / self._num_potentials
+            scores[:, column] = (
+                valid / valid_sum if valid_sum > 1e-10 else 1.0 / self._num_potentials
+            )
         return scores
 
     def _score_vector(self, norms: np.ndarray) -> np.ndarray:
@@ -246,7 +254,9 @@ class QuantumHScorer:
         total = float(np.linalg.norm(norms))
         if total < 1e-10:
             # Degenerate (all-zero) input: uniform distribution
-            return np.ones(self._num_potentials, dtype=np.float64) / self._num_potentials
+            return (
+                np.ones(self._num_potentials, dtype=np.float64) / self._num_potentials
+            )
 
         amplitudes = norms / total
 

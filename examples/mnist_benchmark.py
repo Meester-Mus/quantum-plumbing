@@ -14,7 +14,9 @@ from quantum_plumbing import PotentialMLP, h_utilization, potential_loss
 try:
     from torchvision import datasets, transforms
 except ImportError as exc:  # pragma: no cover
-    raise SystemExit("Install torchvision to run this benchmark: pip install torchvision") from exc
+    raise SystemExit(
+        "Install torchvision to run this benchmark: pip install torchvision"
+    ) from exc
 
 
 def accuracy(logits: torch.Tensor, targets: torch.Tensor) -> float:
@@ -22,9 +24,15 @@ def accuracy(logits: torch.Tensor, targets: torch.Tensor) -> float:
 
 
 def make_loaders(batch_size: int = 128):
-    transform = transforms.Compose([transforms.ToTensor(), transforms.Lambda(lambda x: x.view(-1))])
-    train = datasets.MNIST(root="./data", train=True, download=True, transform=transform)
-    test = datasets.MNIST(root="./data", train=False, download=True, transform=transform)
+    transform = transforms.Compose(
+        [transforms.ToTensor(), transforms.Lambda(lambda x: x.view(-1))]
+    )
+    train = datasets.MNIST(
+        root="./data", train=True, download=True, transform=transform
+    )
+    test = datasets.MNIST(
+        root="./data", train=False, download=True, transform=transform
+    )
     return (
         torch.utils.data.DataLoader(train, batch_size=batch_size, shuffle=True),
         torch.utils.data.DataLoader(test, batch_size=batch_size),
@@ -32,7 +40,9 @@ def make_loaders(batch_size: int = 128):
 
 
 def train_standard(train_loader, test_loader, device: torch.device, epochs: int = 3):
-    model = nn.Sequential(nn.Linear(28 * 28, 256), nn.ReLU(), nn.Linear(256, 10)).to(device)
+    model = nn.Sequential(nn.Linear(28 * 28, 256), nn.ReLU(), nn.Linear(256, 10)).to(
+        device
+    )
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     started = time.perf_counter()
     for _ in range(epochs):

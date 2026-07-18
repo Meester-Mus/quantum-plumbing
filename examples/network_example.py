@@ -12,7 +12,6 @@ Demonstrates:
 import torch
 import torch.optim as optim
 
-import quantum_plumbing as qp
 from quantum_plumbing import (
     PotentialFCLayer,
     PotentialBatchNorm,
@@ -24,10 +23,10 @@ from quantum_plumbing import (
     h_utilization,
 )
 
-
 # ---------------------------------------------------------------------------
 # Synthetic dataset
 # ---------------------------------------------------------------------------
+
 
 def make_dataset(n_samples=512, in_features=32, n_classes=4, seed=42):
     torch.manual_seed(seed)
@@ -44,6 +43,7 @@ def make_loader(X, y, batch_size=32):
 # ---------------------------------------------------------------------------
 # Example 1 – build with PotentialMLP (convenience builder)
 # ---------------------------------------------------------------------------
+
 
 def example_potential_mlp():
     print("=" * 60)
@@ -71,6 +71,7 @@ def example_potential_mlp():
 # ---------------------------------------------------------------------------
 # Example 2 – custom assembly with PotentialSequential
 # ---------------------------------------------------------------------------
+
 
 def example_custom_sequential():
     print("=" * 60)
@@ -101,6 +102,7 @@ def example_custom_sequential():
 # ---------------------------------------------------------------------------
 # Example 3 – full training loop
 # ---------------------------------------------------------------------------
+
 
 def example_training():
     print("=" * 60)
@@ -140,8 +142,9 @@ def example_training():
             optimizer.zero_grad()
 
             output, H = model(xb)
-            loss = potential_loss(output, yb, H=H, task="classification",
-                                  h_diversity_weight=0.01)
+            loss = potential_loss(
+                output, yb, H=H, task="classification", h_diversity_weight=0.01
+            )
             loss.backward()
             optimizer.step()
 
@@ -165,6 +168,7 @@ def example_training():
 # ---------------------------------------------------------------------------
 # Example 4 – inspecting H at inference time
 # ---------------------------------------------------------------------------
+
 
 def example_inspect_h():
     print("=" * 60)
@@ -196,8 +200,10 @@ def example_inspect_h():
 
     # Show that output equals weighted sum of H
     reconstructed = torch.einsum("pb,pbo->bo", scores, H)
-    print(f"  output ≈ weighted_sum(H):  "
-          f"max_diff={torch.max(torch.abs(output - reconstructed)).item():.2e}")
+    print(
+        f"  output ≈ weighted_sum(H):  "
+        f"max_diff={torch.max(torch.abs(output - reconstructed)).item():.2e}"
+    )
     print()
 
 

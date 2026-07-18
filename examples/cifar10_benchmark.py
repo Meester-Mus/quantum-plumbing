@@ -9,12 +9,19 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from quantum_plumbing import PotentialActivation, PotentialConv2d, PotentialSequential, potential_loss
+from quantum_plumbing import (
+    PotentialActivation,
+    PotentialConv2d,
+    PotentialSequential,
+    potential_loss,
+)
 
 try:
     from torchvision import datasets, transforms
 except ImportError as exc:  # pragma: no cover
-    raise SystemExit("Install torchvision to run this benchmark: pip install torchvision") from exc
+    raise SystemExit(
+        "Install torchvision to run this benchmark: pip install torchvision"
+    ) from exc
 
 
 class PotentialConvClassifier(nn.Module):
@@ -38,15 +45,21 @@ class PotentialConvClassifier(nn.Module):
 
 def make_loaders(batch_size: int = 128):
     transform = transforms.ToTensor()
-    train = datasets.CIFAR10(root="./data", train=True, download=True, transform=transform)
-    test = datasets.CIFAR10(root="./data", train=False, download=True, transform=transform)
+    train = datasets.CIFAR10(
+        root="./data", train=True, download=True, transform=transform
+    )
+    test = datasets.CIFAR10(
+        root="./data", train=False, download=True, transform=transform
+    )
     return (
         torch.utils.data.DataLoader(train, batch_size=batch_size, shuffle=True),
         torch.utils.data.DataLoader(test, batch_size=batch_size),
     )
 
 
-def train_model(model, train_loader, device: torch.device, epochs: int = 2, potential: bool = False):
+def train_model(
+    model, train_loader, device: torch.device, epochs: int = 2, potential: bool = False
+):
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     started = time.perf_counter()
     for _ in range(epochs):
@@ -65,7 +78,9 @@ def train_model(model, train_loader, device: torch.device, epochs: int = 2, pote
     return time.perf_counter() - started
 
 
-def evaluate(model, test_loader, device: torch.device, potential: bool = False) -> float:
+def evaluate(
+    model, test_loader, device: torch.device, potential: bool = False
+) -> float:
     model.eval()
     correct = total = 0
     with torch.no_grad():
@@ -92,8 +107,20 @@ def main() -> None:
     potential = PotentialConvClassifier().to(device)
     baseline_time = train_model(baseline, train_loader, device)
     potential_time = train_model(potential, train_loader, device, potential=True)
-    print({"baseline_accuracy": evaluate(baseline, test_loader, device), "baseline_train_time_sec": baseline_time})
-    print({"potential_accuracy": evaluate(potential, test_loader, device, potential=True), "potential_train_time_sec": potential_time})
+    print(
+        {
+            "baseline_accuracy": evaluate(baseline, test_loader, device),
+            "baseline_train_time_sec": baseline_time,
+        }
+    )
+    print(
+        {
+            "potential_accuracy": evaluate(
+                potential, test_loader, device, potential=True
+            ),
+            "potential_train_time_sec": potential_time,
+        }
+    )
 
 
 if __name__ == "__main__":

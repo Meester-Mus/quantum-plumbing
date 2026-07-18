@@ -1,6 +1,7 @@
+from typing import List, Optional, Tuple
+
 import torch
 import torch.nn as nn
-from typing import List, Optional, Tuple, Union
 
 from .layers import (
     PotentialActivation,
@@ -45,9 +46,7 @@ class PotentialSequential(nn.Module):
         super().__init__()
         self.layers = nn.ModuleList(layers)
 
-    def forward(
-        self, x: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Forward pass threading (x, H) through all layers.
 
@@ -86,7 +85,9 @@ class PotentialSequential(nn.Module):
         return x, H
 
     def __repr__(self) -> str:
-        layer_str = "\n".join(f"  ({i}): {layer}" for i, layer in enumerate(self.layers))
+        layer_str = "\n".join(
+            f"  ({i}): {layer}" for i, layer in enumerate(self.layers)
+        )
         return f"PotentialSequential(\n{layer_str}\n)"
 
 
@@ -112,9 +113,13 @@ class PotentialTransformerBlock(nn.Module):
             batch_first=True,
         )
         self.norm1 = PotentialLayerNorm(embed_dim)
-        self.ff1 = PotentialFCLayer(embed_dim, hidden_dim, num_potentials=num_potentials)
+        self.ff1 = PotentialFCLayer(
+            embed_dim, hidden_dim, num_potentials=num_potentials
+        )
         self.activation = PotentialActivation(activation)
-        self.ff2 = PotentialFCLayer(hidden_dim, embed_dim, num_potentials=num_potentials)
+        self.ff2 = PotentialFCLayer(
+            hidden_dim, embed_dim, num_potentials=num_potentials
+        )
         self.norm2 = PotentialLayerNorm(embed_dim)
 
     def forward(
@@ -176,14 +181,14 @@ def PotentialMLP(
         raise ValueError("layer_sizes must have at least 2 elements.")
 
     layers: List[nn.Module] = []
-    num_hidden = len(layer_sizes) - 2  # number of hidden layers
-
     for i in range(len(layer_sizes) - 1):
         in_dim = layer_sizes[i]
         out_dim = layer_sizes[i + 1]
         is_last = i == len(layer_sizes) - 2
 
-        layers.append(PotentialFCLayer(in_dim, out_dim, num_potentials=num_potentials, bias=bias))
+        layers.append(
+            PotentialFCLayer(in_dim, out_dim, num_potentials=num_potentials, bias=bias)
+        )
 
         if not is_last:
             if batch_norm:

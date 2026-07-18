@@ -39,7 +39,9 @@ def potential_loss(
     elif task == "regression":
         base_loss = F.mse_loss(output.squeeze(-1), target.float())
     else:
-        raise ValueError(f"Unknown task '{task}'. Use 'classification' or 'regression'.")
+        raise ValueError(
+            f"Unknown task '{task}'. Use 'classification' or 'regression'."
+        )
 
     if H is not None and h_diversity_weight > 0.0:
         # Diversity regulariser: maximise variance across potentials.
@@ -78,13 +80,17 @@ def h_utilization(H: torch.Tensor) -> torch.Tensor:
         # Normalised entropy: H(p) / log(k)
         num_potentials = scores.shape[0]
         entropy = -torch.sum(scores * torch.log(scores + 1e-8), dim=0)  # (batch,)
-        max_entropy = torch.log(torch.as_tensor(float(num_potentials), dtype=scores.dtype, device=scores.device))
+        max_entropy = torch.log(
+            torch.as_tensor(
+                float(num_potentials), dtype=scores.dtype, device=scores.device
+            )
+        )
         return (entropy / (max_entropy + 1e-8)).mean()
 
     # Fallback: coefficient of variation across potentials
     num_potentials = H.shape[0]
-    mean_h = torch.mean(H, dim=0, keepdim=True)          # (1, batch, features)
-    std_h = torch.std(H, dim=0, keepdim=True)             # (1, batch, features)
+    mean_h = torch.mean(H, dim=0, keepdim=True)  # (1, batch, features)
+    std_h = torch.std(H, dim=0, keepdim=True)  # (1, batch, features)
     cv = (std_h / (torch.abs(mean_h) + 1e-8)).mean()
     # Normalise loosely to [0, 1] by clamping
     return torch.clamp(cv, 0.0, 1.0)
@@ -105,7 +111,9 @@ def h_diversity(H: torch.Tensor) -> torch.Tensor:
     normalized = F.normalize(flat_H, p=2, dim=2, eps=1e-8)
     similarities = torch.einsum("pbf,qbf->pqb", normalized, normalized)
     distances = 1.0 - similarities
-    upper_indices = torch.triu_indices(num_potentials, num_potentials, offset=1, device=H.device)
+    upper_indices = torch.triu_indices(
+        num_potentials, num_potentials, offset=1, device=H.device
+    )
     pairwise = distances[upper_indices[0], upper_indices[1]]
     return pairwise.mean()
 
@@ -119,9 +127,13 @@ def h_confidence(H: torch.Tensor) -> torch.Tensor:
     """
     scores = getattr(H, "_scores", None)
     if scores is None:
-        scores = torch.softmax(torch.norm(H.reshape(H.shape[0], H.shape[1], -1), p=2, dim=2), dim=0)
+        scores = torch.softmax(
+            torch.norm(H.reshape(H.shape[0], H.shape[1], -1), p=2, dim=2), dim=0
+        )
     num_potentials = scores.shape[0]
     entropy = -torch.sum(scores * torch.log(scores + 1e-8), dim=0)
-    max_entropy = torch.log(torch.as_tensor(float(num_potentials), dtype=scores.dtype, device=scores.device))
+    max_entropy = torch.log(
+        torch.as_tensor(float(num_potentials), dtype=scores.dtype, device=scores.device)
+    )
     normalized_entropy = entropy / (max_entropy + 1e-8)
     return (1.0 - normalized_entropy).mean()

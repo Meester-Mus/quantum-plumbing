@@ -38,16 +38,25 @@ class PotentialConv2d(nn.Module):
         self.groups = groups
         self.use_prev_h = use_prev_h
 
-        weight_shape = (num_potentials, out_channels, in_channels // groups, *kernel_size)
+        weight_shape = (
+            num_potentials,
+            out_channels,
+            in_channels // groups,
+            *kernel_size,
+        )
         scale = (in_channels * kernel_size[0] * kernel_size[1]) ** 0.5
         self.weight_potentials = nn.Parameter(torch.randn(weight_shape) / scale)
         self.prev_h_projections = nn.Parameter(torch.randn(weight_shape) / scale)
         if bias:
-            self.bias_potentials = nn.Parameter(torch.zeros(num_potentials, out_channels))
+            self.bias_potentials = nn.Parameter(
+                torch.zeros(num_potentials, out_channels)
+            )
         else:
             self.register_parameter("bias_potentials", None)
 
-    def _conv(self, x: torch.Tensor, weight: torch.Tensor, bias: Optional[torch.Tensor]) -> torch.Tensor:
+    def _conv(
+        self, x: torch.Tensor, weight: torch.Tensor, bias: Optional[torch.Tensor]
+    ) -> torch.Tensor:
         return F.conv2d(
             x,
             weight,

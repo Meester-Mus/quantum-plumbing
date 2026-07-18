@@ -50,21 +50,46 @@ No information loss.
 ## Quick Start
 
 ```python
-from quantum_plumbing.layers import PotentialFCLayer
+import torch
+from quantum_plumbing import PotentialMLP, potential_loss, h_utilization
 
-# Create layer with thinking space
-layer = PotentialFCLayer(
-    in_features=784,
-    out_features=128,
-    num_potentials=8  # Hypothetical space size
+# Build a full thinking network
+model = PotentialMLP(
+    layer_sizes=[784, 256, 128, 10],
+    num_potentials=8,   # Hypothetical space size
 )
 
-# Forward pass preserves H (possibilities)
+# Forward pass – thinking space (H) flows through every layer
 x = torch.randn(32, 784)
-output, H = layer(x)
+output, H = model(x)
 
-# output: (32, 128) – best choice
-# H: (8, 32, 128) – all possibilities considered
+# output: (32, 10)      – best choice
+# H:      (8, 32, 10)   – all possibilities considered
+print(h_utilization(H))  # How much thinking? (0–1)
+
+# Training
+loss = potential_loss(output, targets, H=H, h_diversity_weight=0.01)
+loss.backward()
+```
+
+Or build a custom network layer-by-layer:
+
+```python
+from quantum_plumbing import (
+    PotentialFCLayer, PotentialBatchNorm,
+    PotentialDropout, PotentialActivation,
+    PotentialSequential,
+)
+
+model = PotentialSequential(
+    PotentialFCLayer(784, 256, num_potentials=8),
+    PotentialBatchNorm(256),
+    PotentialDropout(0.1),
+    PotentialActivation('relu'),
+    PotentialFCLayer(256, 10, num_potentials=8),
+)
+
+output, H = model(x)
 ```
 
 ## Philosophy
@@ -91,8 +116,8 @@ This project is about:
 - [x] Theory complete
 - [x] Core concept validated
 - [x] Layers implementation (PotentialFCLayer)
-- [ ] Additional layer types (BatchNorm, Dropout, Activation)
-- [ ] Network assembly
+- [x] Additional layer types (BatchNorm, Dropout, Activation)
+- [x] Network assembly (PotentialSequential, PotentialMLP, potential_loss, h_utilization)
 - [ ] Quantum interface
 - [ ] Full integration
 - [ ] Tests & benchmarks
@@ -114,7 +139,8 @@ pytest tests/
 ## Running Examples
 
 ```bash
-python examples/simple_example.py
+python examples/simple_example.py   # Single layer demo
+python examples/network_example.py  # Full network training
 ```
 
 ## Contributing

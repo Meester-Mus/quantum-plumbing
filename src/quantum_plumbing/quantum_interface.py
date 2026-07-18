@@ -29,7 +29,6 @@ from typing import Optional, Tuple
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 
 from .layers import PotentialFCLayer
 
@@ -327,18 +326,12 @@ class QuantumPotentialFCLayer(PotentialFCLayer):
             output: Actualized output ``(batch_size, out_features)``.
             H:      Hypothetical space ``(num_potentials, batch_size, out_features)``.
         """
-        # ---- STEP 1: Generate H (identical to classical layer) ----------
-        H_list = []
-        for i in range(self.num_potentials):
-            w_i = self.weight_potentials[i]  # (out, in)
-            out_i = F.linear(
-                x,
-                w_i,
-                self.bias_potentials[i] if self.bias_potentials is not None else None,
-            )
-            H_list.append(out_i)
-
-        H = torch.stack(H_list, dim=0)  # (num_potentials, batch, out)
+        # ---- STEP 1: Generate H (vectorized, identical math to classical layer) ----
+        # weight_potentials: (P, O, I)  ·  x: (B, I)  →  H: (P, B, O)
+        # einsum index legend: b=batch, i=in_features, p=num_potentials, o=out_features
+        H = torch.einsum('bi,poi->pbo', x, self.weight_potentials)
+        if self.bias_potentials is not None:
+            H = H + self.bias_potentials.unsqueeze(1)  # (P, 1, O) broadcasts
 
         # ---- STEP 2: Score via quantum circuit --------------------------
         # Scores are detached from the gradient graph: gradients flow

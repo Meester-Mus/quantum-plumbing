@@ -11,6 +11,10 @@ class HAwareOptimizer:
 
     Parameters whose first dimension matches the hypothesis count are scaled by
     the mean hypothesis scores before each optimizer step.
+
+    Only parameters explicitly marked with ``_is_hypothesis_parameter = True``
+    are re-weighted. Core potential layers set this flag on their
+    hypothesis-specific parameters when they are constructed.
     """
 
     def __init__(self, optimizer: torch.optim.Optimizer) -> None:

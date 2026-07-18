@@ -77,6 +77,7 @@ class TestPotentialSequential:
         assert x.grad is not None
         for name, param in net.named_parameters():
             if name == "layers.0.prev_h_projections":
+                # The first FC layer has no incoming H, so its prev_h path is unused.
                 assert param.grad is None
                 continue
             assert param.grad is not None
@@ -169,6 +170,7 @@ class TestPotentialMLP:
         output.sum().backward()
         for name, param in model.named_parameters():
             if name == "layers.0.prev_h_projections":
+                # The first FC layer has no incoming H, so its prev_h path is unused.
                 assert param.grad is None
                 continue
             assert param.grad is not None

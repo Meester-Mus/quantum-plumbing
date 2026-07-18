@@ -53,15 +53,12 @@ class PotentialDropout(nn.Module):
         # Threshold - keep above threshold probability
         threshold = torch.quantile(feature_strength, 1 - self.p)
         mask = (feature_strength > threshold).float()
+        scale = 1.0 / (1.0 - self.p)
 
         # Apply to both x and H
         # Scale to maintain mean
-        x_out = x * mask.unsqueeze(0) * (1.0 / (1.0 - self.p)) if self.p < 1 else x
-        H_out = (
-            H * mask.unsqueeze(0).unsqueeze(0) * (1.0 / (1.0 - self.p))
-            if self.p < 1
-            else H
-        )
+        x_out = x * mask.unsqueeze(0) * scale if self.p < 1 else x
+        H_out = H * mask.unsqueeze(0).unsqueeze(0) * scale if self.p < 1 else H
 
         # Preserve H metadata
         H_out._is_potential = True

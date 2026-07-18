@@ -53,12 +53,15 @@ class PotentialFCLayer(nn.Module):
                 / (in_features**0.5)
             )
         )
-        self.prev_h_projections = mark_hypothesis_parameter(
-            nn.Parameter(
-                torch.randn(num_potentials, out_features, in_features)
-                / (in_features**0.5)
+        if use_prev_h:
+            self.prev_h_projections = mark_hypothesis_parameter(
+                nn.Parameter(
+                    torch.randn(num_potentials, out_features, in_features)
+                    / (in_features**0.5)
+                )
             )
-        )
+        else:
+            self.register_parameter("prev_h_projections", None)
 
         if bias:
             self.bias_potentials = mark_hypothesis_parameter(

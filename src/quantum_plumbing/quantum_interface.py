@@ -97,7 +97,13 @@ class QuantumHScorer:
         # max(1, ...) guards against num_potentials=1 where log2(1)=0
         self._n_qubits: int = max(1, math.ceil(math.log2(num_potentials)))
         self._state_size: int = 2**self._n_qubits
-        self._interference_matrix: Optional[np.ndarray] = None
+        base = np.array([[1.0, 1.0], [1.0, -1.0]], dtype=np.float64) / math.sqrt(2.0)
+        matrix = base
+        for _ in range(self._n_qubits - 1):
+            matrix = np.kron(matrix, base)
+        self._interference_matrix: Optional[np.ndarray] = np.linalg.matrix_power(
+            matrix, self.n_interference_layers
+        )
 
     # ------------------------------------------------------------------
     # Public API
@@ -154,17 +160,6 @@ class QuantumHScorer:
 
         state = np.zeros((self._state_size, norms.shape[1]), dtype=np.float64)
         state[: self._num_potentials] = amplitudes
-
-        if self._interference_matrix is None:
-            base = np.array([[1.0, 1.0], [1.0, -1.0]], dtype=np.float64) / math.sqrt(
-                2.0
-            )
-            matrix = base
-            for _ in range(self._n_qubits - 1):
-                matrix = np.kron(matrix, base)
-            self._interference_matrix = np.linalg.matrix_power(
-                matrix, self.n_interference_layers
-            )
 
         mixed = self._interference_matrix @ state
         probs = mixed**2

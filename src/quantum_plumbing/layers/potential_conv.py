@@ -83,9 +83,15 @@ class PotentialConv2d(nn.Module):
             )
             if prev_H is not None and self.use_prev_h:
                 if prev_H.shape[0] != self.num_potentials:
-                    raise ValueError("prev_H first dimension must match num_potentials")
+                    raise ValueError(
+                        "prev_H first dimension must match "
+                        f"num_potentials={self.num_potentials}, got {prev_H.shape[0]}"
+                    )
                 if prev_H.shape[2] != self.in_channels:
-                    raise ValueError("prev_H channel dimension must match in_channels")
+                    raise ValueError(
+                        "prev_H channel dimension must match "
+                        f"in_channels={self.in_channels}, got {prev_H.shape[2]}"
+                    )
                 out_i = out_i + self._conv(prev_H[i], self.prev_h_projections[i], None)
             H_list.append(out_i)
 

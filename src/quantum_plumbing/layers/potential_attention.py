@@ -66,7 +66,9 @@ class PotentialMultiheadAttention(nn.Module):
             if H is not None and self.use_prev_h:
                 if H.shape[0] != self.num_potentials or H.shape[-1] != self.embed_dim:
                     raise ValueError(
-                        "prev H shape is incompatible with attention layer"
+                        "prev H shape is incompatible with attention layer: "
+                        f"expected first dim {self.num_potentials} and last dim "
+                        f"{self.embed_dim}, got {tuple(H.shape)}"
                     )
                 out_i = out_i + self.prev_h_projections[i](H[i])
             outputs.append(out_i)

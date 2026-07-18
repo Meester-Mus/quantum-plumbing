@@ -40,7 +40,7 @@ def make_loaders(batch_size: int = 128):
 
 
 def train_standard(train_loader, test_loader, device: torch.device, epochs: int = 3):
-    model = nn.Sequential(nn.Linear(28 * 28, 512), nn.ReLU(), nn.Linear(512, 10)).to(
+    model = nn.Sequential(nn.Linear(28 * 28, 128), nn.ReLU(), nn.Linear(128, 10)).to(
         device
     )
     optimizer = optim.Adam(model.parameters(), lr=1e-3)

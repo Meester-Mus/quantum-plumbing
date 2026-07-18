@@ -140,36 +140,30 @@ Result: Full potentiality preserved and used
 
 ## Implementation Strategy
 
-### Phase 1: Classical Potential Layers ✓ (In Progress)
-- Build H in software
-- Test on MNIST
-- Verify thinking works
+### Phase 1: Research-First Baseline (current)
+- Stabilize classical H-preserving layers and network composition
+- Prioritize educational demo quality and reproducibility
+- Validate with lightweight, interpretable experiments
 
-### Phase 2: Additional Layers
-- Potential BatchNorm
-- Potential Dropout
-- Potential Activation
-- Potential Loss
+### Phase 2: Simulator Quantum Stability (current/near-term)
+- Maintain Classical ↔ Quantum mapping with Qiskit simulation
+- Validate score consistency and interface contracts
+- Keep this phase simulator-only (no hardware backend dependency)
 
-### Phase 3: Network Assembly
-- Full network with H-flow
-- Training loops that preserve H
-- Metrics that measure thinking
+### Phase 3: Comparative Research Discipline
+- Expand controlled comparisons and benchmark protocol
+- Improve reporting of accuracy + H metrics + overhead tradeoffs
+- Strengthen repeatability for external researchers
 
-### Phase 4: Interface Design
-- Classical ↔ Quantum mapping
-- No measurement collapse
-- Bidirectional flow
+### Phase 4: Richer Interpretability + Layer Extensions
+- Extend analysis and visualization for H trajectories
+- Add carefully evaluated layer variants
+- Keep conceptual clarity as design constraint
 
-### Phase 5: Quantum Integration
-- Map to real quantum computer
-- Test full system
-- Demonstrate advantage
-
-### Phase 6: Scale & Deploy
-- Larger networks
-- Harder problems
-- World recognition
+### Phase 5: Hardware-Oriented Quantum Exploration (deferred)
+- Introduce real backend workflows after simulator maturity
+- Evaluate shot-based behavior and backend-specific constraints
+- Test hybrid execution strategies
 
 ## Success Metrics
 

@@ -9,6 +9,15 @@ Quantum Plumbing implements hypothetical thinking space (H) through four key arc
 3. **H actualization** - Choose best while remembering alternatives
 4. **H propagation** - Pass H forward so next layer knows alternatives exist
 
+## Current Implementation Scope
+
+This repository is currently developed as a research-first prototype:
+
+- Educational and inspectable demos are first-class deliverables
+- Classical H-preserving layers and network assembly are the baseline
+- Quantum integration in this phase targets simulator-only stability
+- Hardware backend execution is intentionally deferred
+
 ## Core Data Flow
 
 ```

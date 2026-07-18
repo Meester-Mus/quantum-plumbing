@@ -124,6 +124,13 @@ class TestQuantumHScorer:
         # Only one potential: score must be 1.0
         assert torch.allclose(scores, torch.ones(1, 4), atol=1e-5)
 
+    def test_simulator_scoring_is_deterministic(self):
+        scorer = QuantumHScorer(num_potentials=4)
+        H = torch.randn(4, 6, 8)
+        scores_a = scorer.score(H)
+        scores_b = scorer.score(H)
+        assert torch.allclose(scores_a, scores_b)
+
     def test_repr(self):
         scorer = QuantumHScorer(num_potentials=4, n_interference_layers=2)
         r = repr(scorer)
@@ -147,6 +154,10 @@ class TestQuantumPotentialFCLayer:
         output, H = layer(x)
         assert output.shape == (8, 10)
         assert H.shape == (4, 8, 10)
+
+    def test_default_backend_uses_simulator(self):
+        layer = QuantumPotentialFCLayer(10, 5, num_potentials=4)
+        assert layer.quantum_scorer._backend is None
 
     def test_h_metadata_present(self):
         layer = QuantumPotentialFCLayer(10, 5, num_potentials=4)

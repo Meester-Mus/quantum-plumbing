@@ -78,7 +78,7 @@ def h_utilization(H: torch.Tensor) -> torch.Tensor:
         # Normalised entropy: H(p) / log(k)
         num_potentials = scores.shape[0]
         entropy = -torch.sum(scores * torch.log(scores + 1e-8), dim=0)  # (batch,)
-        max_entropy = torch.log(torch.tensor(float(num_potentials)))
+        max_entropy = torch.log(torch.as_tensor(float(num_potentials), dtype=scores.dtype, device=scores.device))
         return (entropy / (max_entropy + 1e-8)).mean()
 
     # Fallback: coefficient of variation across potentials

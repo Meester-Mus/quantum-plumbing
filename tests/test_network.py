@@ -225,14 +225,14 @@ class TestHUtilization:
     def test_with_scores_metadata(self):
         """Uses _scores attribute when present (as set by PotentialFCLayer)."""
         H = torch.randn(4, 8, 10)
-        # Uniform scores → max entropy → utilisation = 1
+        # Uniform scores → max entropy → utilization = 1
         uniform_scores = torch.ones(4, 8) / 4
         H._scores = uniform_scores
         util = h_utilization(H)
         assert torch.isclose(util, torch.tensor(1.0), atol=1e-5)
 
     def test_with_scores_peaked(self):
-        """Peaked distribution → low utilisation."""
+        """Peaked distribution → low utilization."""
         H = torch.randn(4, 8, 10)
         peaked_scores = torch.zeros(4, 8)
         peaked_scores[0] = 1.0  # all weight on potential 0
@@ -241,7 +241,7 @@ class TestHUtilization:
         assert util.item() < 0.1
 
     def test_from_real_layer(self):
-        """Utilisation computed from a real PotentialFCLayer output."""
+        """Utilization computed from a real PotentialFCLayer output."""
         layer = PotentialFCLayer(10, 5, num_potentials=4)
         x = torch.randn(8, 10)
         _, H = layer(x)

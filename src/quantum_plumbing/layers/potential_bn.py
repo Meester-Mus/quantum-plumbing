@@ -5,19 +5,24 @@ from typing import Tuple, Optional
 
 class PotentialBatchNorm(nn.Module):
     """
-    Batch Normalization that preserves thinking space (H).
+    Batch Normalization that preserves hypothetical thinking space (H).
     
-    Key difference from standard BatchNorm:
-    - Standard: Normalize x only
-    - Potential: Normalize x FROM H perspective
+    Key insight:
+    - Standard BatchNorm: Normalize x (discard H)
+    - Potential BatchNorm: Normalize x FROM H perspective (preserve H)
     
-    This preserves the hypothetical structure through normalization.
+    This means:
+    - We calculate mean/variance from H (all possibilities)
+    - We normalize x using H statistics
+    - We preserve H structure through normalization
+    
+    Result: H flows through BatchNorm without collapse
     """
     
     def __init__(self, num_features: int, eps: float = 1e-5, momentum: float = 0.1):
         """
         Args:
-            num_features: Number of features
+            num_features: Number of features to normalize
             eps: Small constant for numerical stability
             momentum: Momentum for running statistics
         """
@@ -26,21 +31,22 @@ class PotentialBatchNorm(nn.Module):
         self.eps = eps
         self.momentum = momentum
         
-        # Learnable parameters
+        # Learnable scale and shift parameters
         self.weight = nn.Parameter(torch.ones(num_features))
         self.bias = nn.Parameter(torch.zeros(num_features))
         
-        # Running statistics
+        # Running statistics for inference
         self.register_buffer('running_mean', torch.zeros(num_features))
         self.register_buffer('running_var', torch.ones(num_features))
         
+        # Metadata
         self._is_potential_layer = True
         self._layer_type = "BatchNorm"
     
     def forward(self, x: torch.Tensor, 
                 H: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Forward pass normalizing FROM H perspective.
+        Forward pass: Normalize from H perspective.
         
         Args:
             x: Input (batch_size, num_features)
@@ -51,39 +57,63 @@ class PotentialBatchNorm(nn.Module):
             H_norm: Normalized hypotheses
         """
         
-        # Calculate statistics FROM H (not from x alone)
-        # This gives normalization from hypothetical perspective
-        
         if self.training:
-            # Calculate mean and variance from H
-            # Mean over batch and features
+            # STEP 1: Calculate statistics FROM H
+            # This is key - we normalize x based on what H tells us
+            
+            # Shape of H: (num_potentials, batch_size, num_features)
+            # We want mean/var over batch and potentials
+            
+            # Mean across batch and potentials
             mean_H = torch.mean(H, dim=(1, 2))  # (num_potentials,)
-            var_H = torch.var(H, dim=(1, 2))  # (num_potentials,)
             
-            # Normalize both x and H
-            x_norm = (x - mean_H[0]) / torch.sqrt(var_H[0] + self.eps)
+            # Variance across batch and potentials
+            var_H = torch.var(H, dim=(1, 2), unbiased=False)  # (num_potentials,)
             
-            # Normalize H
+            # Take mean of H statistics (average across potentials)
+            mean = torch.mean(mean_H)
+            var = torch.mean(var_H)
+            
+            # STEP 2: Normalize x using H statistics
+            # This is crucial: x is normalized from H perspective
+            x_norm = (x - mean) / torch.sqrt(var + self.eps)
+            
+            # STEP 3: Normalize H using same statistics
+            # Reshape for broadcasting
             H_expanded_mean = mean_H.view(-1, 1, 1)  # (num_potentials, 1, 1)
             H_expanded_var = var_H.view(-1, 1, 1)  # (num_potentials, 1, 1)
+            
+            # Normalize H
             H_norm = (H - H_expanded_mean) / torch.sqrt(H_expanded_var + self.eps)
             
-            # Update running statistics
+            # STEP 4: Update running statistics (for inference)
             with torch.no_grad():
-                self.running_mean = (1 - self.momentum) * self.running_mean + self.momentum * mean_H[0]
-                self.running_var = (1 - self.momentum) * self.running_var + self.momentum * var_H[0]
-        else:
-            # Use running statistics
-            x_norm = (x - self.running_mean) / torch.sqrt(self.running_var + self.eps)
-            H_norm = H  # In inference, just return H
+                self.running_mean.copy_(
+                    (1 - self.momentum) * self.running_mean + self.momentum * mean
+                )
+                self.running_var.copy_(
+                    (1 - self.momentum) * self.running_var + self.momentum * var
+                )
         
-        # Apply learnable scale and shift
+        else:
+            # Inference: use running statistics
+            x_norm = (x - self.running_mean) / torch.sqrt(self.running_var + self.eps)
+            H_norm = H  # In inference, H not needed for normalization
+        
+        # STEP 5: Apply learnable scale and shift
+        # These help the network learn optimal normalization
         x_norm = x_norm * self.weight + self.bias
         H_norm = H_norm * self.weight.view(1, 1, -1) + self.bias.view(1, 1, -1)
         
-        # Preserve H metadata
+        # STEP 6: Preserve H metadata
         H_norm._is_potential = True
         H_norm._layer = "BatchNorm"
-        H_norm._meaning = "Normalized hypotheses"
+        H_norm._meaning = "Hypotheses after potential batch normalization"
+        H_norm._normalized_from_potentials = True
         
         return x_norm, H_norm
+    
+    def extra_repr(self) -> str:
+        return (f'num_features={self.num_features}, '
+                f'eps={self.eps}, '
+                f'momentum={self.momentum}')

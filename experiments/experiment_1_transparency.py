@@ -13,6 +13,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import json
+import os
 from datetime import datetime
 
 
@@ -251,7 +252,7 @@ class TransparencyTest:
             
             # Homo sapiens sapiens can trace
             print(f"\n✓ HOMO SAPIENS SAPIENS CAN TRACE THINKING")
-            print(f"  - See each layer's potentialität")
+            print(f"  - See each layer's potentialiteit")
             print(f"  - See choices made")
             print(f"  - Understand WHY")
             
@@ -306,6 +307,9 @@ class TransparencyTest:
 if __name__ == "__main__":
     test = TransparencyTest()
     results = test.run_all()
+    
+    # Ensure results directory exists
+    os.makedirs('results', exist_ok=True)
     
     # Save results
     with open('results/experiment_1_transparency.json', 'w') as f:
